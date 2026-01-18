@@ -128,8 +128,8 @@ async function enrichAppointmentsWithDetails(appointments: any[]) {
   if (appointments.length === 0) return [];
   
   const adminSupabase = createAdminClient();
-  const departmentIds = [...new Set(appointments.map(a => a.department_id).filter(Boolean))];
-  const roomIds = [...new Set(appointments.map(a => a.room_id).filter(Boolean))];
+  const departmentIds = Array.from(new Set(appointments.map(a => a.department_id).filter(Boolean)));
+  const roomIds = Array.from(new Set(appointments.map(a => a.room_id).filter(Boolean)));
   
   let departmentMap: Record<string, { name: string }> = {};
   let roomMap: Record<string, { room_number: string }> = {};
