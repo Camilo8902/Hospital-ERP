@@ -7,7 +7,6 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id');
     const status = searchParams.get('status') || undefined;
     const patientId = searchParams.get('patientId') || undefined;
-    const doctorId = searchParams.get('doctorId') || undefined;
     const startDate = searchParams.get('startDate') || undefined;
     const endDate = searchParams.get('endDate') || undefined;
     const search = searchParams.get('search') || undefined;
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const orders = await getLabOrders(
-      { status, patientId, doctorId, startDate, endDate, search },
+      { status, patientId, startDate, endDate, search },
       limit
     );
 
