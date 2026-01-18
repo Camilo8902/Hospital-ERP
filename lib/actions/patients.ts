@@ -3,28 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
-
-export interface Patient {
-  id: string;
-  medical_record_number: string;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  phone: string;
-  dob: string;
-  gender: string | null;
-  address: string | null;
-  city: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_phone: string | null;
-  blood_type: string | null;
-  allergies: string[] | null;
-  insurance_provider: string | null;
-  insurance_policy_number: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import type { Patient } from '@/lib/types';
 
 // Obtener todos los pacientes
 export async function getPatients(): Promise<Patient[]> {
