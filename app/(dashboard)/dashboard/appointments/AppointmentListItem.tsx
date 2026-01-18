@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
   Clock, 
   User, 
@@ -11,7 +12,9 @@ import {
   XCircle,
   Play,
   MoreVertical,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  Pill
 } from 'lucide-react';
 import { updateAppointmentStatus, deleteAppointment } from '@/lib/actions/appointments';
 
@@ -205,39 +208,56 @@ export default function AppointmentListItem({ appointment }: AppointmentListItem
 
           {/* Acciones */}
           <div className="flex-shrink-0">
-            <div className="relative">
-              <button
-                onClick={() => setShowActions(!showActions)}
-                className="btn-secondary btn-sm px-2"
+            <div className="flex items-center gap-1">
+              <Link
+                href={`/dashboard/appointments/${appointment.id}`}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Ver detalle"
               >
-                <MoreVertical className="w-4 h-4" />
-              </button>
+                <FileText className="w-4 h-4 text-gray-500" />
+              </Link>
+              <Link
+                href={`/dashboard/pharmacy/prescriptions/new?appointment_id=${appointment.id}&patient_id=${appointment.patient_id}`}
+                className="p-2 hover:bg-primary-50 rounded-lg transition-colors"
+                title="Crear receta"
+              >
+                <Pill className="w-4 h-4 text-primary-600" />
+              </Link>
+              
+              <div className="relative ml-1">
+                <button
+                  onClick={() => setShowActions(!showActions)}
+                  className="btn-secondary btn-sm px-2"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
 
-              {showActions && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border py-1 z-10">
-                  {canStart && (
-                    <button onClick={() => handleStatusChange('in_progress')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                      <Play className="w-4 h-4 text-blue-500" /> Iniciar cita
-                    </button>
-                  )}
-                  {canComplete && (
-                    <button onClick={() => handleStatusChange('completed')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-green-500" /> Completar
-                    </button>
-                  )}
-                  {canCancel && (
-                    <>
-                      <button onClick={handleCancel} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
-                        <XCircle className="w-4 h-4" /> Cancelar cita
+                {showActions && (
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border py-1 z-10">
+                    {canStart && (
+                      <button onClick={() => handleStatusChange('in_progress')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+                        <Play className="w-4 h-4 text-blue-500" /> Iniciar cita
                       </button>
-                      <hr className="my-1" />
-                      <button onClick={handleDelete} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
-                        <XCircle className="w-4 h-4" /> Eliminar
+                    )}
+                    {canComplete && (
+                      <button onClick={() => handleStatusChange('completed')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" /> Completar
                       </button>
-                    </>
-                  )}
-                </div>
-              )}
+                    )}
+                    {canCancel && (
+                      <>
+                        <button onClick={handleCancel} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
+                          <XCircle className="w-4 h-4" /> Cancelar cita
+                        </button>
+                        <hr className="my-1" />
+                        <button onClick={handleDelete} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
+                          <XCircle className="w-4 h-4" /> Eliminar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
