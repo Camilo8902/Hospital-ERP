@@ -121,7 +121,7 @@ const icd10Database: ICD10Code[] = [
   { code: 'O09.1', description: 'Supervisión de embarazo ectópico', category: 'O' },
   
   // Categoría Q - Malformaciones congénitas
-  { code: 'Q90.9', descripción: 'Síndrome de Down, no especificado', category: 'Q' },
+  { code: 'Q90.9', description: 'Sindrome de Down, no especificado', category: 'Q' },
   
   // Categoría R - Síntomas, signos y hallazgos anormales
   { code: 'R05', description: 'Tos', category: 'R' },
