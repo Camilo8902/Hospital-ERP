@@ -17,12 +17,9 @@ export default async function DashboardLayout({
   }
 
   // Obtener el rol directamente de los metadatos del usuario
-  const userRole = (user.raw_user_meta_data?.role as string) || 
-                   (user.user_metadata?.role as string) || 
-                   'reception';
+  const userRole = (user.user_metadata?.role as string) || 'reception';
   
-  const userName = (user.raw_user_meta_data?.full_name as string) || 
-                   (user.user_metadata?.full_name as string) || 
+  const userName = (user.user_metadata?.full_name as string) || 
                    user.email || 
                    'Usuario';
 

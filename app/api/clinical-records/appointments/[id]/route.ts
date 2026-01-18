@@ -71,7 +71,7 @@ export async function GET(
     }
 
     // 5. Enriquecer recetas con datos del doctor
-    const doctorIds = [...new Set(prescriptions.map(rx => rx.doctor_id).filter(Boolean))];
+    const doctorIds = Array.from(new Set(prescriptions.map(rx => rx.doctor_id).filter(Boolean)));
     let doctorMap: Record<string, { full_name: string; specialty: string | null }> = {};
 
     if (doctorIds.length > 0) {

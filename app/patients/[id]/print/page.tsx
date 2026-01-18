@@ -102,7 +102,7 @@ async function enrichRecordsWithDoctors(records: any[]) {
   if (records.length === 0) return [];
   
   const adminSupabase = createAdminClient();
-  const doctorIds = [...new Set(records.map(r => r.doctor_id).filter(Boolean))];
+  const doctorIds = Array.from(new Set(records.map(r => r.doctor_id).filter(Boolean)));
   
   let doctorMap: Record<string, { full_name: string; specialty: string | null }> = {};
   
@@ -130,7 +130,7 @@ async function enrichAppointmentsWithDetails(appointments: any[]) {
   if (appointments.length === 0) return [];
   
   const adminSupabase = createAdminClient();
-  const departmentIds = [...new Set(appointments.map(a => a.department_id).filter(Boolean))];
+  const departmentIds = Array.from(new Set(appointments.map(a => a.department_id).filter(Boolean)));
   
   let departmentMap: Record<string, { name: string }> = {};
   

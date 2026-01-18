@@ -29,7 +29,7 @@ export async function GET(
     console.log(`[Clinical Records] Registros médicos encontrados: ${records?.length || 0}`);
 
     // Obtener doctor_ids únicos para enriquecer
-    const doctorIds = [...new Set(records?.map(r => r.doctor_id).filter(Boolean) || [])];
+    const doctorIds = Array.from(new Set(records?.map(r => r.doctor_id).filter(Boolean) || []));
     
     let doctorMap: Record<string, { full_name: string; specialty: string | null }> = {};
 
