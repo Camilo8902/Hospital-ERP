@@ -364,11 +364,22 @@ export default function LabOrderPrintPage({ params }: PageProps) {
             size: letter;
           }
           
-          body {
-            font-size: 10pt;
-            line-height: 1.4;
-            color: #1e293b;
-            background: white;
+          * {
+            visibility: hidden;
+          }
+          
+          #print-content,
+          #print-content * {
+            visibility: visible;
+          }
+          
+          #print-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 20px;
           }
           
           .print-hide {
@@ -385,6 +396,10 @@ export default function LabOrderPrintPage({ params }: PageProps) {
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+          }
+          
+          body {
+            background-color: #f3f4f6;
           }
         }
       `}</style>

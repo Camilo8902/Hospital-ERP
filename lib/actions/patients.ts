@@ -23,6 +23,7 @@ export interface Patient {
   insurance_policy_number: string | null;
   notes: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 // Obtener todos los pacientes
@@ -313,4 +314,5 @@ export async function createPatientNote(
     console.error('Error inesperado al crear anotacion:', error);
     return { success: false, error: 'Ocurrio un error inesperado' };
   }
+}
 }
