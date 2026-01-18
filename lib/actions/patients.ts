@@ -315,4 +315,3 @@ export async function createPatientNote(
     return { success: false, error: 'Ocurrio un error inesperado' };
   }
 }
-}
