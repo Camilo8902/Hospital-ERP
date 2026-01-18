@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Rutas públicas que no requieren autenticación
-const publicRoutes = ['/login', '/auth/callback'];
+const publicRoutes = ['/login', '/auth/callback', '/auth/confirm'];
 
 // Rutas que requieren roles específicos
 const roleRestrictedRoutes: Record<string, string[]> = {
@@ -19,15 +19,22 @@ const roleRestrictedRoutes: Record<string, string[]> = {
   '/dashboard/users/new': ['admin'],
   '/dashboard/users/[id]': ['admin'],
   '/dashboard/settings': ['admin'],
+  '/dashboard/lab': ['admin', 'lab', 'lab_admin', 'doctor'],
 };
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
+  const { pathname } = request.nextUrl;
+  
+  // Verificar si es una ruta pública primero para evitar procesamiento innecesario
+  const isPublicRoute = publicRoutes.some(route => 
+    pathname.startsWith(route)
+  );
+  
+  if (isPublicRoute) {
+    return NextResponse.next();
+  }
+  
+  // Crear cliente de Supabase
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,52 +47,46 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
         },
       },
     }
   );
-
-  // Verificar si es una ruta pública
-  const isPublicRoute = publicRoutes.some(route =>
-    request.nextUrl.pathname.startsWith(route)
-  );
-
-  if (!isPublicRoute) {
-    // Verificar sesión
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      // Redirigir a login si no hay sesión
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-
-    // Verificar rol del usuario para rutas restringidas
-    const userRole = session.user.user_metadata?.role || 'reception';
-
-    for (const [route, roles] of Object.entries(roleRestrictedRoutes)) {
-      if (request.nextUrl.pathname.startsWith(route)) {
-        if (!roles.includes(userRole)) {
-          // Redirigir a acceso no autorizado o dashboard
-          return NextResponse.redirect(new URL('/dashboard', request.url));
-        }
+  
+  // Verificar sesión
+  const { data: { session }, error } = await supabase.auth.getSession();
+  
+  // Si hay error o no hay sesión, redirigir al login
+  if (error || !session) {
+    const loginUrl = new URL('/login', request.url);
+    // Guardar la ruta original para redirigir después del login
+    loginUrl.searchParams.set('redirectedFrom', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+  
+  // Verificar rol del usuario para rutas restringidas
+  const userRole = session.user.user_metadata?.role || 'reception';
+  
+  for (const [route, roles] of Object.entries(roleRestrictedRoutes)) {
+    // Convertir la ruta del patrón a regex para coincidencia
+    const routePattern = route.replace(/\[id\]/g, '[^/]+');
+    const regex = new RegExp(`^${routePattern}`);
+    
+    if (regex.test(pathname)) {
+      if (!roles.includes(userRole)) {
+        // Redirigir a acceso no autorizado o dashboard
+        return NextResponse.redirect(new URL('/dashboard', request.url));
       }
     }
   }
-
-  // Refrescar token si es necesario
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    await supabase.auth.refreshSession();
-  }
-
+  
+  // Crear respuesta y refrescar token de forma asíncrona sin bloquear
+  const response = NextResponse.next();
+  
+  // Refrescar sesión en background
+  supabase.auth.refreshSession().catch(() => {
+    // Silenciosamente ignorar errores de refresh
+  });
+  
   return response;
 }
 
@@ -93,12 +94,13 @@ export const config = {
   matcher: [
     /*
      * Coincidir con todas las rutas de solicitud excepto:
-     * - api (API routes)
+     * - api (API routes) - se manejan por separado
      * - _next/static (archivos estáticos)
      * - _next/image (optimización de imágenes)
      * - favicon.ico (icono)
      * - public folder
+     * - Archivos con extensiones conocidas
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2|ttf|otf)$).*)',
   ],
 };
