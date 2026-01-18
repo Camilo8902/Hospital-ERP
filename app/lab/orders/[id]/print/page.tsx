@@ -11,7 +11,7 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-interface LabOrderDetailWithTest extends LabOrderDetail {
+interface LabOrderDetailWithTest extends Omit<LabOrderDetail, 'tests'> {
   tests?: {
     id: string;
     code: string;
