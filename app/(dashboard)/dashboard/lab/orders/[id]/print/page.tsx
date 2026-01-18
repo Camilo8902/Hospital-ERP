@@ -48,9 +48,9 @@ export default async function LabOrderPrintPage({ params }: PrintPageProps) {
     ? `${order.patients.first_name} ${order.patients.last_name}` 
     : 'Sin nombre';
   const patientPhone = order.patients?.phone || '-';
-  const patientDocument = order.patients?.document_number || '-';
-  const patientAge = order.patients?.birth_date 
-    ? Math.floor((new Date().getTime() - new Date(order.patients.birth_date).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+  const patientDocument = order.patients?.medical_record_number || '-';
+  const patientAge = order.patients?.dob 
+    ? Math.floor((new Date().getTime() - new Date(order.patients.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     : '-';
 
   // Obtener nombre del doctor
