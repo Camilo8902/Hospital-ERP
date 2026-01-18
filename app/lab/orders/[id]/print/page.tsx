@@ -322,7 +322,7 @@ export default function LabOrderPrintPage({ params }: PageProps) {
                 </div>
               )}
 
-              {(detailItem.notes) && (
+              {detailItem.notes && detailItem.notes.trim().length > 0 && (
                 <div style={{ padding: '6px 8px', backgroundColor: '#fafafa', border: '1px solid #e2e8f0', borderTop: 'none', fontSize: '8pt' }}>
                   <strong style={{ color: '#6b7280' }}>Notas:</strong> {detailItem.notes}
                 </div>

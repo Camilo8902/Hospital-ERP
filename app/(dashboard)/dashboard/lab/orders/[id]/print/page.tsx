@@ -187,7 +187,7 @@ export default async function LabOrderPrintPage({ params }: PrintPageProps) {
                     <p className="text-gray-500 italic">No hay parámetros definidos</p>
                   )}
                   
-                  {detailData.notes && (
+                  {!!detailData.notes && (
                     <div className="mt-3 pt-2 border-t border-gray-200">
                       <p className="text-sm text-gray-600">
                         <span className="font-medium">Observaciones:</span> {detailData.notes as string}
