@@ -5,7 +5,7 @@ import LabOrderForm from '@/components/lab/LabOrderForm';
 export const dynamic = 'force-dynamic';
 
 async function getPatientsData() {
-  return getPatients(undefined, 100);
+  return getPatients();
 }
 
 function LoadingSkeleton() {
