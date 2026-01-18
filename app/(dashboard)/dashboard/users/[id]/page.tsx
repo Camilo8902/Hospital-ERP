@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getUserById } from '@/lib/actions/users';
 import UserForm from '@/components/users/UserForm';
+import PasswordUpdateForm from '@/components/users/PasswordUpdateForm';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -73,6 +74,8 @@ export default async function EditUserPage({ params }: PageProps) {
           <UserForm user={user} isEditing={true} />
         </div>
       </div>
+
+      <PasswordUpdateForm userId={user.id} userName={user.full_name} />
     </div>
   );
 }
