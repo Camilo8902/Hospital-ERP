@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 
 // Base de datos de códigos ICD-10
-const icd10Database = [
+interface ICD10Code {
+  code: string;
+  description: string;
+  category: string;
+}
+
+const icd10Database: ICD10Code[] = [
   // Categoría A - Ciertas enfermedades infecciosas y parasitarias
   { code: 'A00.0', description: 'Cólera debida a Vibrio cholerae 01, biovar cholerae', category: 'A' },
   { code: 'A00.1', description: 'Cólera debida a Vibrio cholerae 01, biovar eltor', category: 'A' },
