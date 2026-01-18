@@ -100,7 +100,7 @@ async function enrichMedicalRecordsWithDoctors(records: any[]) {
   if (records.length === 0) return [];
   
   const adminSupabase = createAdminClient();
-  const doctorIds = [...new Set(records.map(r => r.doctor_id).filter(Boolean))];
+  const doctorIds = Array.from(new Set(records.map(r => r.doctor_id).filter(Boolean)));
   
   let doctorMap: Record<string, { full_name: string; specialty: string | null }> = {};
   
