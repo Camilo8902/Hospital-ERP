@@ -137,7 +137,7 @@ export async function getPatientClinicalHistory(patientId: string): Promise<Clin
   }
 
   // Obtener doctor_ids únicos
-  const doctorIds = [...new Set(records.map(r => r.doctor_id).filter(Boolean))];
+  const doctorIds = Array.from(new Set(records.map(r => r.doctor_id).filter(Boolean)));
   
   let doctorMap: Record<string, { full_name: string; specialty: string | null }> = {};
 

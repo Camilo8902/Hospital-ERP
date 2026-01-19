@@ -133,10 +133,10 @@ export async function getAppointments(
   }
 
   // Obtener todos los patient_ids y doctor_ids
-  const patientIds = [...new Set(filteredAppointments.map(a => a.patient_id).filter(Boolean))];
-  const doctorIds = [...new Set(filteredAppointments.map(a => a.doctor_id).filter(Boolean))];
-  const departmentIds = [...new Set(filteredAppointments.map(a => a.department_id).filter(Boolean))];
-  const roomIds = [...new Set(filteredAppointments.map(a => a.room_id).filter(Boolean))];
+  const patientIds = Array.from(new Set(filteredAppointments.map(a => a.patient_id).filter(Boolean)));
+  const doctorIds = Array.from(new Set(filteredAppointments.map(a => a.doctor_id).filter(Boolean)));
+  const departmentIds = Array.from(new Set(filteredAppointments.map(a => a.department_id).filter(Boolean)));
+  const roomIds = Array.from(new Set(filteredAppointments.map(a => a.room_id).filter(Boolean)));
 
   // Obtener pacientes
   const { data: patients } = patientIds.length > 0

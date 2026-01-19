@@ -97,8 +97,8 @@ export async function getTodayAppointments(): Promise<AppointmentListItem[]> {
   }
 
   // Obtener patient_ids y doctor_ids únicos
-  const patientIds = [...new Set(appointments.map(a => a.patient_id).filter(Boolean))];
-  const doctorIds = [...new Set(appointments.map(a => a.doctor_id).filter(Boolean))];
+  const patientIds = Array.from(new Set(appointments.map(a => a.patient_id).filter(Boolean)));
+  const doctorIds = Array.from(new Set(appointments.map(a => a.doctor_id).filter(Boolean)));
 
   // Obtener pacientes
   const { data: patients } = patientIds.length > 0

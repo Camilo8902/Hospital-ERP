@@ -317,9 +317,9 @@ export async function getInventoryMovements(
   const movements = data || [];
   
   // Obtener nombres de productos y usuarios por separado
-  const inventoryIds = [...new Set(movements.map(m => m.inventory_id).filter(Boolean))];
-  const userIds = [...new Set(movements.map(m => m.performed_by).filter(Boolean))];
-  const transactionIds = [...new Set(movements.map(m => m.id).filter(Boolean))];
+  const inventoryIds = Array.from(new Set(movements.map(m => m.inventory_id).filter(Boolean)));
+  const userIds = Array.from(new Set(movements.map(m => m.performed_by).filter(Boolean)));
+  const transactionIds = Array.from(new Set(movements.map(m => m.id).filter(Boolean)));
 
   let inventoryMap: Record<string, { name: string; sku: string }> = {};
   let userMap: Record<string, string> = {};
@@ -632,8 +632,8 @@ export async function getPrescriptions(
   let prescriptions = data || [];
   
   // Obtener datos relacionados por separado
-  const patientIds = [...new Set(prescriptions.map(rx => rx.patient_id).filter(Boolean))];
-  const doctorIds = [...new Set(prescriptions.map(rx => rx.doctor_id).filter(Boolean))];
+  const patientIds = Array.from(new Set(prescriptions.map(rx => rx.patient_id).filter(Boolean)));
+  const doctorIds = Array.from(new Set(prescriptions.map(rx => rx.doctor_id).filter(Boolean)));
 
   let patientMap: Record<string, { first_name: string; last_name: string; phone: string; email: string | null }> = {};
   let doctorMap: Record<string, { full_name: string; specialty: string | null }> = {};
@@ -758,8 +758,8 @@ export async function getPrescriptionsByAppointment(appointmentId: string): Prom
   let prescriptions = data || [];
   
   // Obtener datos relacionados por separado
-  const patientIds = [...new Set(prescriptions.map(rx => rx.patient_id).filter(Boolean))];
-  const doctorIds = [...new Set(prescriptions.map(rx => rx.doctor_id).filter(Boolean))];
+  const patientIds = Array.from(new Set(prescriptions.map(rx => rx.patient_id).filter(Boolean)));
+  const doctorIds = Array.from(new Set(prescriptions.map(rx => rx.doctor_id).filter(Boolean)));
 
   let patientMap: Record<string, { first_name: string; last_name: string; phone: string; email: string | null }> = {};
   let doctorMap: Record<string, { full_name: string; specialty: string | null }> = {};
@@ -1032,7 +1032,7 @@ export async function searchProducts(query: string, limit: number = 10): Promise
 
 export async function getCategories(): Promise<string[]> {
   const products = await getInventoryProducts();
-  const categories = [...new Set(products.map(p => p.category))];
+  const categories = Array.from(new Set(products.map(p => p.category)));
   return categories.sort();
 }
 
@@ -1058,7 +1058,7 @@ export async function getPrescriptionsByPatient(patientId: string): Promise<Pres
   }
 
   // Obtener doctor_ids para enriquecer los datos
-  const doctorIds = [...new Set(prescriptions.map(rx => rx.doctor_id).filter(Boolean))];
+  const doctorIds = Array.from(new Set(prescriptions.map(rx => rx.doctor_id).filter(Boolean)));
   
   let doctorMap: Record<string, { full_name: string; specialty: string | null }> = {};
 
