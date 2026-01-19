@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDateTime, formatDate } from '@/lib/utils';
-import type { LabOrder, LabTestCatalog, LabTestParameter, LabResult, LabOrderDetail } from '@/lib/types';
+import type { LabOrder, LabTestCatalog, LabTestParameter, LabOrderResult, LabOrderDetail } from '@/lib/types';
 
 interface LabOrderDetailProps {
   initialOrder: LabOrder;
@@ -23,7 +23,7 @@ interface LabOrderDetailProps {
 
 interface LabOrderDetailWithTest extends Omit<LabOrderDetail, 'tests' | 'lab_results'> {
   tests?: LabTestCatalog;
-  lab_results?: LabResult[];
+  lab_results?: LabOrderResult[];
 }
 
 // Utilidad para calcular edad
