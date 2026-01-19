@@ -348,7 +348,7 @@ export async function finalizeConsultation(
     // Verificar que el registro tenga datos mínimos requeridos
     const { data: record } = await adminSupabase
       .from('medical_records')
-      .select('id, chief_complaint, diagnosis, treatment_plan')
+      .select('*, patient_id')
       .eq('id', clinicalRecordId)
       .single();
 
