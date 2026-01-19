@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { formatDate } from '@/lib/utils';
 import type { Patient, MedicalRecord, Appointment, Prescription, PatientNote, LabOrder } from '@/lib/types';
+import type { PrescriptionWithRelations } from '@/lib/actions/pharmacy';
 
 interface EnrichedMedicalRecord extends Omit<MedicalRecord, 'profiles'> {
   profiles?: {
@@ -21,7 +22,7 @@ interface PatientHistoryPrintClientProps {
   patient: Patient;
   medicalRecords: EnrichedMedicalRecord[];
   appointments: EnrichedAppointment[];
-  prescriptions: Prescription[];
+  prescriptions: PrescriptionWithRelations[];
   labOrders: LabOrder[];
   patientNotes: PatientNote[];
 }
