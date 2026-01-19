@@ -436,7 +436,12 @@ export async function addInventoryMovement(
         .eq('id', movementData.inventory_id);
 
       if (updateError) {
-        await adminSupabase.rpc('ROLLBACK_TRANSACTION').catch(() => {});
+        // Intentar hacer rollback si falla la actualización (sin .catch ya que no existe en los tipos)
+        try {
+          await adminSupabase.rpc('ROLLBACK_TRANSACTION');
+        } catch (rollbackError) {
+          // Ignorar errores de rollback
+        }
         return { success: false, error: updateError.message };
       }
 
@@ -456,11 +461,21 @@ export async function addInventoryMovement(
         });
 
       if (movementError) {
-        await adminSupabase.rpc('ROLLBACK_TRANSACTION').catch(() => {});
+        // Intentar hacer rollback si falla el registro del movimiento (sin .catch ya que no existe en los tipos)
+        try {
+          await adminSupabase.rpc('ROLLBACK_TRANSACTION');
+        } catch (rollbackError) {
+          // Ignorar errores de rollback
+        }
         return { success: false, error: movementError.message };
       }
 
-      await adminSupabase.rpc('COMMIT_TRANSACTION').catch(() => {});
+      // Hacer commit de la transacción (sin .catch ya que no existe en los tipos)
+      try {
+        await adminSupabase.rpc('COMMIT_TRANSACTION');
+      } catch (commitError) {
+        // Ignorar errores de commit
+      }
     } else {
       // Usar transacción manual si RPC no está disponible
       // Actualizar inventario

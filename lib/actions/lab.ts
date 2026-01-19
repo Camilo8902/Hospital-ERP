@@ -8,7 +8,6 @@ import type {
   LabTestParameter,
   LabStats,
   LabOrderStatus,
-  LabResultStatus,
 } from '@/lib/types';
 
 // ============================================
