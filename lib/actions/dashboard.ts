@@ -81,7 +81,7 @@ export async function getTodayAppointments(): Promise<AppointmentListItem[]> {
   // Primero obtener las citas
   const { data: appointments, error } = await adminSupabase
     .from('appointments')
-    .select('id, start_time, status, reason, doctor_id, patient_id')
+    .select('id, start_time, status, reason, doctor_id, patient_id, appointment_type')
     .gte('start_time', todayUTC.toISOString())
     .lt('start_time', tomorrowUTC.toISOString())
     .order('start_time', { ascending: true })
