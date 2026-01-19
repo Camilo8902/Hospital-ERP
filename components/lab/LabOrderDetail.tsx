@@ -21,7 +21,7 @@ interface LabOrderDetailProps {
   initialOrder: LabOrder;
 }
 
-interface LabOrderDetailWithTest extends LabOrderDetail {
+interface LabOrderDetailWithTest extends Omit<LabOrderDetail, 'tests' | 'lab_results'> {
   tests?: LabTestCatalog;
   lab_results?: LabResult[];
 }

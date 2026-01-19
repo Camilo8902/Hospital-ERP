@@ -4,14 +4,14 @@ import { useEffect } from 'react';
 import { formatDate } from '@/lib/utils';
 import type { Patient, MedicalRecord, Appointment, Prescription, PatientNote, LabOrder } from '@/lib/types';
 
-interface EnrichedMedicalRecord extends MedicalRecord {
+interface EnrichedMedicalRecord extends Omit<MedicalRecord, 'profiles'> {
   profiles?: {
     full_name: string;
     specialty?: string;
   };
 }
 
-interface EnrichedAppointment extends Appointment {
+interface EnrichedAppointment extends Omit<Appointment, 'departments'> {
   departments?: {
     name: string;
   };

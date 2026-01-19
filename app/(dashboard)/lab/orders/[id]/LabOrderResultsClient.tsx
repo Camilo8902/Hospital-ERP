@@ -24,7 +24,7 @@ import {
   ExtendedLabTestCatalog
 } from '@/components/lab/labParameterUtils';
 
-interface LabOrderDetailWithTest extends LabOrderDetail {
+interface LabOrderDetailWithTest extends Omit<LabOrderDetail, 'tests' | 'lab_results'> {
   tests?: LabTestCatalog;
   lab_results?: LabOrderResult[];
 }
