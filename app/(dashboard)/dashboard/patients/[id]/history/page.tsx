@@ -412,12 +412,18 @@ export default function PatientHistoryPage() {
                         record.record_type === 'consultation' ? 'badge-primary' :
                         record.record_type === 'progress_note' ? 'badge-info' :
                         record.record_type === 'procedure' ? 'badge-warning' :
+                        record.record_type === 'discharge' ? 'badge-success' :
+                        record.record_type === 'referral' ? 'badge-secondary' :
+                        record.record_type === 'lab_result' ? 'badge-danger' :
                         'badge-gray'
                       }`}>
                         {record.record_type === 'consultation' ? 'Consulta' :
                          record.record_type === 'progress_note' ? 'Nota de Progreso' :
                          record.record_type === 'procedure' ? 'Procedimiento' :
-                         record.record_type}
+                         record.record_type === 'discharge' ? 'Alta Médica' :
+                         record.record_type === 'referral' ? 'Referencia' :
+                         record.record_type === 'lab_result' ? 'Resultado de Laboratorio' :
+                         'Resultado de Imagen'}
                       </span>
                       <span className="text-sm text-gray-500 flex items-center gap-1">
                         <Calendar className="w-4 h-4" />

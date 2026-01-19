@@ -193,8 +193,7 @@ export default function PatientHistoryPrintClient({
                        record.record_type === 'progress_note' ? 'NOTA DE EVOLUCIÓN' :
                        record.record_type === 'referral' ? 'REFERENCIA' :
                        record.record_type === 'lab_result' ? 'RESULTADO DE LABORATORIO' :
-                       record.record_type === 'imaging_result' ? 'RESULTADO DE IMAGEN' :
-                       record.record_type?.toUpperCase()}
+                       'RESULTADO DE IMAGEN'}
                     </span>
                     <span style={{ color: '#64748b', marginLeft: '8px' }}>{formatDate(record.visit_date)}</span>
                   </div>

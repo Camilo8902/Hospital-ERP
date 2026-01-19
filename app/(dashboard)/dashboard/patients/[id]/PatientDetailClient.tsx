@@ -358,12 +358,18 @@ export default function PatientDetailClient({
                         record.record_type === 'consultation' ? 'badge-info' :
                         record.record_type === 'procedure' ? 'badge-warning' :
                         record.record_type === 'discharge' ? 'badge-success' :
+                        record.record_type === 'progress_note' ? 'badge-primary' :
+                        record.record_type === 'referral' ? 'badge-secondary' :
+                        record.record_type === 'lab_result' ? 'badge-danger' :
                         'badge-gray'
                       }`}>
                         {record.record_type === 'consultation' ? 'Consulta' :
                          record.record_type === 'procedure' ? 'Procedimiento' :
                          record.record_type === 'discharge' ? 'Alta' :
-                         record.record_type}
+                         record.record_type === 'progress_note' ? 'Nota de Progreso' :
+                         record.record_type === 'referral' ? 'Referencia' :
+                         record.record_type === 'lab_result' ? 'Laboratorio' :
+                         'Imagen'}
                       </span>
                       <span className="text-sm text-gray-500">
                         {formatDate(record.visit_date)}
@@ -828,7 +834,10 @@ export default function PatientDetailClient({
                       {record.record_type === 'consultation' ? 'CONSULTA' :
                        record.record_type === 'procedure' ? 'PROCEDIMIENTO' :
                        record.record_type === 'discharge' ? 'ALTA MÉDICA' :
-                       record.record_type?.toUpperCase()}
+                       record.record_type === 'progress_note' ? 'NOTA DE EVOLUCIÓN' :
+                       record.record_type === 'referral' ? 'REFERENCIA' :
+                       record.record_type === 'lab_result' ? 'RESULTADO DE LABORATORIO' :
+                       'RESULTADO DE IMAGEN'}
                     </span>
                     <span className="text-gray-600 ml-2">- {formatDate(record.visit_date)}</span>
                   </div>
