@@ -117,10 +117,10 @@ export default async function LabOrderPrintPage({ params }: PrintPageProps) {
           <div className="space-y-6">
             {order.lab_order_details.map((detail) => {
               // Acceder a los datos del test
-              const detailData = detail as unknown as Record<string, unknown>;
-              const testsData = detailData.tests as Record<string, unknown> | undefined;
-              const testName = (testsData?.name as string) || 'Prueba sin nombre';
-              const testCode = (testsData?.code as string) || null;
+              const detailData = detail as unknown as Record<string, any>;
+              const testsData = detailData.tests as Record<string, any> | undefined;
+              const testName = testsData?.name || 'Prueba sin nombre';
+              const testCode = testsData?.code || null;
               
               // Obtener parámetros
               const labParameters = testsData?.lab_parameters as LabParameterRow[] | undefined;

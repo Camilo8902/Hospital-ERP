@@ -96,11 +96,11 @@ export default function LabOrdersList({ initialOrders }: LabOrdersListProps) {
     return order.lab_order_details
       .map((d) => {
         // Acceder correctamente a los datos anidados
-        const detailData = d as unknown as Record<string, unknown>;
-        const testsData = detailData.tests as Record<string, unknown> | undefined;
+        const detailData = d as unknown as Record<string, any>;
+        const testsData = detailData.tests as Record<string, any> | undefined;
         return {
           id: d.id,
-          name: (testsData?.name as string) || 'Sin nombre'
+          name: testsData?.name || 'Sin nombre'
         };
       })
       .filter(test => test.name && test.name !== 'Sin nombre');

@@ -41,17 +41,18 @@ export function isValueAbnormal(
   let refMax: number | null | undefined;
   
   // reference_min/max del schema del usuario
-  if ((param as unknown as Record<string, unknown>).reference_min !== undefined) {
-    const minVal = (param as unknown as Record<string, unknown>).reference_min;
-    refMin = minVal !== null ? Number(minVal) : null;
+  const paramRecord = param as unknown as Record<string, string | number | null | undefined>;
+  if (paramRecord.reference_min !== undefined) {
+    const minVal = paramRecord.reference_min;
+    refMin = minVal !== null && minVal !== undefined ? Number(minVal) : null;
   } else if (param.ref_range_min !== undefined) {
     refMin = param.ref_range_min;
   }
   
   // reference_max del schema del usuario
-  if ((param as unknown as Record<string, unknown>).reference_max !== undefined) {
-    const maxVal = (param as unknown as Record<string, unknown>).reference_max;
-    refMax = maxVal !== null ? Number(maxVal) : null;
+  if (paramRecord.reference_max !== undefined) {
+    const maxVal = paramRecord.reference_max;
+    refMax = maxVal !== null && maxVal !== undefined ? Number(maxVal) : null;
   } else if (param.ref_range_max !== undefined) {
     refMax = param.ref_range_max;
   }
@@ -79,17 +80,18 @@ export function isValueCritical(
   let criticalAbove: number | null | undefined;
   
   // is_critical_below del schema del usuario
-  if ((param as unknown as Record<string, unknown>).is_critical_below !== undefined) {
-    const val = (param as unknown as Record<string, unknown>).is_critical_below;
-    criticalBelow = val !== null ? Number(val) : null;
+  const paramRecord = param as unknown as Record<string, string | number | null | undefined>;
+  if (paramRecord.is_critical_below !== undefined) {
+    const val = paramRecord.is_critical_below;
+    criticalBelow = val !== null && val !== undefined ? Number(val) : null;
   } else if (param.critical_min !== undefined) {
     criticalBelow = param.critical_min;
   }
   
   // is_critical_above del schema del usuario
-  if ((param as unknown as Record<string, unknown>).is_critical_above !== undefined) {
-    const val = (param as unknown as Record<string, unknown>).is_critical_above;
-    criticalAbove = val !== null ? Number(val) : null;
+  if (paramRecord.is_critical_above !== undefined) {
+    const val = paramRecord.is_critical_above;
+    criticalAbove = val !== null && val !== undefined ? Number(val) : null;
   } else if (param.critical_max !== undefined) {
     criticalAbove = param.critical_max;
   }
@@ -105,8 +107,9 @@ export function isValueCritical(
  */
 export function getReferenceRangeText(param: LabTestParameter): string {
   // reference_text del schema del usuario
-  if ((param as unknown as Record<string, unknown>).reference_text) {
-    return (param as unknown as Record<string, unknown>).reference_text as string;
+  const paramRecord = param as unknown as Record<string, string | number | null | undefined>;
+  if (paramRecord.reference_text) {
+    return paramRecord.reference_text as string;
   }
   
   if (param.ref_range_text) {
@@ -117,14 +120,14 @@ export function getReferenceRangeText(param: LabTestParameter): string {
   let refMin: string | number | null | undefined;
   let refMax: string | number | null | undefined;
   
-  if ((param as unknown as Record<string, unknown>).reference_min !== undefined) {
-    refMin = (param as unknown as Record<string, unknown>).reference_min;
+  if (paramRecord.reference_min !== undefined) {
+    refMin = paramRecord.reference_min;
   } else if (param.ref_range_min !== undefined) {
     refMin = param.ref_range_min;
   }
   
-  if ((param as unknown as Record<string, unknown>).reference_max !== undefined) {
-    refMax = (param as unknown as Record<string, unknown>).reference_max;
+  if (paramRecord.reference_max !== undefined) {
+    refMax = paramRecord.reference_max;
   } else if (param.ref_range_max !== undefined) {
     refMax = param.ref_range_max;
   }
@@ -149,8 +152,9 @@ export function getReferenceRangeText(param: LabTestParameter): string {
  */
 export function getParameterSortOrder(param: LabTestParameter): number {
   // order_index del schema del usuario
-  if ((param as unknown as Record<string, number>).order_index !== undefined) {
-    return (param as unknown as Record<string, number>).order_index;
+  const paramRecord = param as unknown as Record<string, number | undefined>;
+  if (paramRecord.order_index !== undefined) {
+    return paramRecord.order_index;
   }
   
   return param.sort_order || 0;
