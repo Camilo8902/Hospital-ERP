@@ -121,7 +121,7 @@ export default function LabOrderPrintPage({ params }: PageProps) {
   // Obtener el perfil del usuario que completó la orden
   useEffect(() => {
     if (order?.completed_by) {
-      async function fetchCompletedByProfile() {
+      const fetchCompletedByProfile = async () => {
         try {
           const response = await fetch(`/api/users/${order.completed_by}`);
           if (response.ok) {
@@ -131,7 +131,7 @@ export default function LabOrderPrintPage({ params }: PageProps) {
         } catch (err) {
           console.error('Error al obtener perfil del responsable:', err);
         }
-      }
+      };
       fetchCompletedByProfile();
     }
   }, [order?.completed_by]);
