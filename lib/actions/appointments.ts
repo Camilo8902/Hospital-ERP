@@ -139,36 +139,44 @@ export async function getAppointments(
   const roomIds = Array.from(new Set(filteredAppointments.map(a => a.room_id).filter(Boolean)));
 
   // Obtener pacientes
-  const { data: patients } = patientIds.length > 0
-    ? await adminSupabase
-        .from('patients')
-        .select('id, first_name, last_name, phone, email')
-        .in('id', patientIds)
-    : { data: [], error: null };
+  let patients: any[] = [];
+  if (patientIds.length > 0) {
+    const result = await adminSupabase
+      .from('patients')
+      .select('id, first_name, last_name, phone, email')
+      .in('id', patientIds);
+    patients = result.data || [];
+  }
 
   // Obtener doctores
-  const { data: doctors } = doctorIds.length > 0
-    ? await adminSupabase
-        .from('profiles')
-        .select('id, full_name, specialty')
-        .in('id', doctorIds)
-    : { data: [], error: null };
+  let doctors: any[] = [];
+  if (doctorIds.length > 0) {
+    const result = await adminSupabase
+      .from('profiles')
+      .select('id, full_name, specialty')
+      .in('id', doctorIds);
+    doctors = result.data || [];
+  }
 
   // Obtener departamentos
-  const { data: departments } = departmentIds.length > 0
-    ? await adminSupabase
-        .from('departments')
-        .select('id, name')
-        .in('id', departmentIds)
-    : { data: [], error: null };
+  let departments: any[] = [];
+  if (departmentIds.length > 0) {
+    const result = await adminSupabase
+      .from('departments')
+      .select('id, name')
+      .in('id', departmentIds);
+    departments = result.data || [];
+  }
 
   // Obtener habitaciones
-  const { data: rooms } = roomIds.length > 0
-    ? await adminSupabase
-        .from('rooms')
-        .select('id, room_number')
-        .in('id', roomIds)
-    : { data: [], error: null };
+  let rooms: any[] = [];
+  if (roomIds.length > 0) {
+    const result = await adminSupabase
+      .from('rooms')
+      .select('id, room_number')
+      .in('id', roomIds);
+    rooms = result.data || [];
+  }
 
   // Crear mapas para acceso rápido
   const patientMap = new Map(patients?.map(p => [p.id, p]) || []);

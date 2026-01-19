@@ -101,20 +101,24 @@ export async function getTodayAppointments(): Promise<AppointmentListItem[]> {
   const doctorIds = Array.from(new Set(appointments.map(a => a.doctor_id).filter(Boolean)));
 
   // Obtener pacientes
-  const { data: patients } = patientIds.length > 0
-    ? await adminSupabase
-        .from('patients')
-        .select('id, first_name, last_name')
-        .in('id', patientIds)
-    : { data: [], error: null };
+  let patients: any[] = [];
+  if (patientIds.length > 0) {
+    const result = await adminSupabase
+      .from('patients')
+      .select('id, first_name, last_name')
+      .in('id', patientIds);
+    patients = result.data || [];
+  }
 
   // Obtener doctores
-  const { data: doctors } = doctorIds.length > 0
-    ? await adminSupabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', doctorIds)
-    : { data: [], error: null };
+  let doctors: any[] = [];
+  if (doctorIds.length > 0) {
+    const result = await adminSupabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', doctorIds);
+    doctors = result.data || [];
+  }
 
   // Crear mapas
   const patientMap = new Map(patients?.map(p => [p.id, p]) || []);
