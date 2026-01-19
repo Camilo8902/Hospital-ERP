@@ -5,7 +5,26 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { updatePatient } from '@/lib/actions/patients';
-import type { Patient } from '@/lib/types';
+
+interface Patient {
+  id: string;
+  medical_record_number: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string;
+  dob: string;
+  gender: string | null;
+  address: string | null;
+  city: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  blood_type: string | null;
+  allergies: string[] | null;
+  insurance_provider: string | null;
+  insurance_policy_number: string | null;
+  notes: string | null;
+}
 
 interface EditPatientPageProps {
   patient: Patient;
@@ -19,19 +38,19 @@ export default function EditPatientPage({ patient }: EditPatientPageProps) {
   const [formData, setFormData] = useState({
     first_name: patient.first_name,
     last_name: patient.last_name,
-    email: patient.email ?? '',
+    email: patient.email || '',
     phone: patient.phone,
     dob: patient.dob,
-    gender: patient.gender ?? '',
-    address: patient.address ?? '',
-    city: patient.city ?? '',
-    emergency_contact_name: patient.emergency_contact_name ?? '',
-    emergency_contact_phone: patient.emergency_contact_phone ?? '',
-    blood_type: patient.blood_type ?? '',
-    allergies: patient.allergies?.join(', ') ?? '',
-    insurance_provider: patient.insurance_provider ?? '',
-    insurance_policy_number: patient.insurance_policy_number ?? '',
-    notes: patient.notes ?? '',
+    gender: patient.gender || '',
+    address: patient.address || '',
+    city: patient.city || '',
+    emergency_contact_name: patient.emergency_contact_name || '',
+    emergency_contact_phone: patient.emergency_contact_phone || '',
+    blood_type: patient.blood_type || '',
+    allergies: patient.allergies?.join(', ') || '',
+    insurance_provider: patient.insurance_provider || '',
+    insurance_policy_number: patient.insurance_policy_number || '',
+    notes: patient.notes || '',
   });
 
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];

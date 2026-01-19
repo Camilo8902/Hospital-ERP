@@ -5,15 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, FileText, Pill, User, Phone, Mail, MapPin, Edit, Plus, Trash2, Loader2, TestTube, StickyNote, X, Save, Printer } from 'lucide-react';
 import { formatDate, formatRelativeTime, getInitials, getAppointmentStatusColor, calculateAge } from '@/lib/utils';
-import type { Patient, MedicalRecord, Appointment, UserRole, LabOrder, PatientNote } from '@/lib/types';
+import type { Patient, MedicalRecord, Appointment, Prescription, UserRole, LabOrder, PatientNote } from '@/lib/types';
 import { deletePatient, createPatientNote } from '@/lib/actions/patients';
-import type { PrescriptionWithRelations } from '@/lib/actions/pharmacy';
 
 interface PatientDetailClientProps {
   patient: Patient;
   medicalRecords: (MedicalRecord & { profiles?: { full_name: string; specialty?: string } })[];
   appointments: (Appointment & { departments?: { name: string }; rooms?: { room_number: string } })[];
-  prescriptions: PrescriptionWithRelations[];
+  prescriptions: Prescription[];
   labOrders: LabOrder[];
   patientNotes: PatientNote[];
   currentUserId: string;

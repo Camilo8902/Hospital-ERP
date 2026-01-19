@@ -152,8 +152,8 @@ export interface Prescription {
   id: string;
   medical_record_id: string;
   patient_id: string;
-  doctor_id?: string | null;
-  medication_id?: string | null;
+  doctor_id?: string;
+  medication_id?: string;
   medication_name: string;
   dosage: string;
   frequency: string;
@@ -162,10 +162,10 @@ export interface Prescription {
   quantity_dispensed: number;
   refills_allowed: number;
   refills_used: number;
-  instructions?: string | null;
+  instructions?: string;
   status: 'pending' | 'partially_dispensed' | 'dispensed' | 'cancelled' | 'expired';
   prescribed_date: string;
-  dispensed_date?: string | null;
+  dispensed_date?: string;
   created_at: string;
   updated_at: string;
   // Campos relacionados
