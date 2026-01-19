@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getLabOrderById } from '@/lib/actions/lab';
 import { formatDateTime, formatDate } from '@/lib/utils';
-import type { LabTestParameter, LabOrderResult, LabOrderDetail } from '@/lib/types';
+import type { LabTestParameter, LabOrderResult, LabOrderDetail, GenderType } from '@/lib/types';
 import type { LabOrder } from '@/lib/types';
 import type { Profile } from '@/lib/types';
 
@@ -46,7 +46,7 @@ function calculateAge(birthDate: string | undefined): string {
 }
 
 // Utilidad para obtener etiqueta de género
-function getGenderLabel(gender: string | undefined): string {
+function getGenderLabel(gender: string | null | undefined): string {
   if (!gender) return 'No especificado';
   const labels: Record<string, string> = {
     'male': 'Masculino',
@@ -251,7 +251,7 @@ export default function LabOrderPrintPage({ params }: PageProps) {
                 <td style={{ padding: '2px 0', color: '#64748b' }}>Edad:</td>
                 <td style={{ padding: '2px 0', fontWeight: 'bold' }}>{calculateAge(order.patients?.dob)}</td>
                 <td style={{ padding: '2px 0', color: '#64748b' }}>Sexo:</td>
-                <td style={{ padding: '2px 0', fontWeight: 'bold' }}>{getGenderLabel(order.patients?.gender)}</td>
+                <td style={{ padding: '2px 0', fontWeight: 'bold' }}>{getGenderLabel(order.patients?.gender ?? undefined)}</td>
               </tr>
               <tr>
                 <td style={{ padding: '2px 0', color: '#64748b' }}>Teléfono:</td>

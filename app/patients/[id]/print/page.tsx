@@ -33,7 +33,7 @@ function calculateAge(dob: string | undefined): string {
 }
 
 // Utilidad para obtener etiqueta de género
-function getGenderLabel(gender: string | undefined): string {
+function getGenderLabel(gender: string | null | undefined): string {
   if (!gender) return 'No especificado';
   const labels: Record<string, string> = {
     'male': 'Masculino',
