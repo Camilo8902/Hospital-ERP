@@ -56,7 +56,7 @@ export default function LabOrderForm({ patients, initialPatientId }: LabOrderFor
       .then(res => res.json())
       .then(data => {
         setCatalog(data);
-        const cats = Array.from(new Set(data.map((t: LabTestCatalog) => t.category?.name || 'Sin categoría')));
+        const cats: string[] = Array.from(new Set(data.map((t: LabTestCatalog) => t.category?.name || 'Sin categoría')));
         setCategories(cats.sort());
       })
       .catch(err => console.error('Error cargando catálogo:', err));
