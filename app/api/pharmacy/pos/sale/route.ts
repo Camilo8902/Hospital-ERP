@@ -1,8 +1,24 @@
 import { NextResponse } from 'next/server';
 import { processPOSale } from '@/lib/actions/pharmacy';
+<<<<<<< HEAD
 
 export async function POST(request: Request) {
   try {
+=======
+import { getCurrentUser } from '@/lib/supabase/server';
+
+export async function POST(request: Request) {
+  try {
+    // Verificar autenticación
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: 'No autorizado. Por favor inicie sesión.' },
+        { status: 401 }
+      );
+    }
+
+>>>>>>> 1e4c369 (Signed-off-by: Camilo8902 <ernesto.rodriguez120289@gmail.com>)
     const body = await request.json();
     const { items, paymentMethod, customerName, notes } = body;
 
