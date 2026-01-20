@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server';
 import { processPOSale } from '@/lib/actions/pharmacy';
-
-export async function POST(request: Request) {
-  try {
-
 import { getCurrentUser } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
