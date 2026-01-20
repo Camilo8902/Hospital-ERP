@@ -218,6 +218,8 @@ export interface InvoiceItem {
   quantity: number;
   unit_price: number;
   total: number;
+  source_type?: string;
+  source_id?: string;
 }
 
 export interface AuditLog {

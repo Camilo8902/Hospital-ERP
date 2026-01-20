@@ -215,7 +215,10 @@ export async function getInvoiceById(invoiceId: string): Promise<Invoice | null>
       return null;
     }
 
-    return data as Invoice;
+    return {
+      ...data,
+      updated_at: data.updated_at || new Date().toISOString()
+    } as Invoice;
   } catch (error) {
     console.error('Error al obtener factura:', error);
     return null;
