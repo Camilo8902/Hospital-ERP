@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { refundPayment } from '@/lib/actions/payments';
 import { getCurrentUser, getCurrentProfile } from '@/lib/supabase/server';
-import type { ProcessRefundDTO, ProcessRefundResponse } from '@/lib/types';
 
 // ============================================
 // POST /api/payments/transactions/[id]/refund
-// Procesa un reembolso para una transacción
+// NOTA: Los reembolsos no están implementados en el esquema actual
+// Esta funcionalidad requeriría una tabla separada de reembolsos
+// ============================================
+
+// ============================================
+// POST /api/payments/transactions/[id]/refund
+// NOTA: Los reembolsos no están implementados en el esquema actual
+// Esta funcionalidad requeriría una tabla separate de reembolsos
 // ============================================
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-): Promise<NextResponse<ProcessRefundResponse>> {
+): Promise<NextResponse<{ success: boolean; error?: string }>> {
   try {
     // Verificar autenticación
     const user = await getCurrentUser();
@@ -26,43 +31,29 @@ export async function POST(
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'ID de transacción requerido' },
+        { success: false, error: 'ID requerido' },
         { status: 400 }
       );
     }
 
     // Verificar que el usuario tiene permisos de administrador
     const profile = await getCurrentProfile();
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'billing')) {
+    if (!profile || profile.role !== 'admin') {
       return NextResponse.json(
-        { success: false, error: 'No tiene permisos para procesar reembolsos' },
+        { success: false, error: 'Solo administradores pueden procesar reembolsos' },
         { status: 403 }
       );
     }
 
-    // Parsear el cuerpo de la solicitud
-    const body: ProcessRefundDTO = await request.json();
-
-    if (!body.reason) {
-      return NextResponse.json(
-        { success: false, error: 'La razón del reembolso es requerida' },
-        { status: 400 }
-      );
-    }
-
-    // Procesar el reembolso
-    const result = await refundPayment(id, body);
-
-    if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: 400 }
-      );
-    }
-
+    // Los reembolsos requieren una tabla adicional en la base de datos
+    // Para implementar reembolsos, sería necesario:
+    // 1. Crear una tabla 'payment_refunds' con los campos necesarios
+    // 2. Agregar funcionalidad para registrar y rastrear reembolsos
+    // 3. Modificar la tabla invoices para soportar múltiples pagos parciales
+    
     return NextResponse.json({
-      success: true,
-      refund: result.refund,
+      success: false,
+      error: 'Los reembolsos no están disponibles en el esquema actual. Para implementar esta funcionalidad, se requiere una tabla de reembolsos adicional.',
     });
   } catch (error) {
     console.error('Error al procesar reembolso:', error);
