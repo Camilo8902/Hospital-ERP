@@ -462,3 +462,74 @@ export interface PatientNote {
   content: string;
   created_at: string;
 }
+
+// ============================================
+// TIPOS PARA PUNTO DE VENTA (POS) DE FARMACIA
+// ============================================
+
+export type POSPaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'INSURANCE';
+export type POSTransactionStatus = 'COMPLETED' | 'CANCELLED' | 'REFUNDED';
+
+export interface CartItem {
+  productId: string;
+  sku: string;
+  name: string;
+  category: string;
+  price: number;
+  quantity: number;
+  stockAvailable: number;
+  discount: number;
+  subtotal: number;
+}
+
+export interface POSTransactionItem {
+  id: string;
+  transaction_id: string;
+  inventory_id: string;
+  sku: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit_price: number;
+  discount: number;
+  subtotal: number;
+  created_at: string;
+}
+
+export interface POSTransaction {
+  id: string;
+  transaction_number: string;
+  status: POSTransactionStatus;
+  payment_method: POSPaymentMethod;
+  subtotal: number;
+  discount_total: number;
+  tax_amount: number;
+  total_amount: number;
+  items_count: number;
+  customer_name?: string;
+  notes?: string;
+  operator_id: string;
+  operator_name: string;
+  created_at: string;
+  updated_at: string;
+  // Items relacionados
+  items?: POSTransactionItem[];
+}
+
+export interface POSStats {
+  totalSalesToday: number;
+  transactionCountToday: number;
+  averageTicket: number;
+  topSellingProducts: Array<{
+    name: string;
+    quantity_sold: number;
+    revenue: number;
+  }>;
+}
+
+export interface TransactionPayload {
+  items: CartItem[];
+  paymentMethod: POSPaymentMethod;
+  customerName?: string;
+  notes?: string;
+}

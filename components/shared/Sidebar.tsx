@@ -17,6 +17,7 @@ import {
   UserCog,
   FlaskConical,
   X,
+  ShoppingCart,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useMobileMenu } from './MobileMenuContext';
@@ -50,6 +51,12 @@ const navigationConfig = [
     href: '/dashboard/pharmacy',
     icon: Pill,
     roles: ['admin', 'pharmacy', 'doctor'],
+  },
+  {
+    name: 'Punto de Venta',
+    href: '/dashboard/pharmacy/pos',
+    icon: ShoppingCart,
+    roles: ['admin', 'pharmacy'],
   },
   {
     name: 'Laboratorio',

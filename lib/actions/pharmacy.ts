@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from './users';
+import type { POSTransaction, POSStats } from '@/lib/types';
 
 // Tipos específicos para farmacia
 export interface PharmacyProduct {
@@ -1097,4 +1098,476 @@ export async function getPrescriptionsByPatient(patientId: string): Promise<Pres
     profiles: rx.doctor_id ? (doctorMap[rx.doctor_id] || null) : null,
     medical_records: null, // No necesitamos datos del registro médico
   }));
+}
+
+// ============================================
+// PUNTO DE VENTA (POS)
+// ============================================
+
+export interface POSSaleItem {
+  inventory_id: string;
+  quantity: number;
+  unit_price: number;
+  discount: number;
+}
+
+export interface ProcessPOSaleResult {
+  success: boolean;
+  transaction_id?: string;
+  transaction_number?: string;
+  error?: string;
+}
+
+/**
+ * Procesa una venta en el punto de venta
+ * Maneja la transacción atómicamente: crea registro de venta, descuenta inventario y registra movimientos
+ */
+export async function processPOSale(
+  items: POSSaleItem[],
+  paymentMethod: 'CASH' | 'CARD' | 'TRANSFER' | 'INSURANCE',
+  customerName?: string,
+  notes?: string
+): Promise<ProcessPOSaleResult> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Generar número de transacción
+    const today = new Date().toISOString().split('T')[0];
+    const { data: lastTransaction } = await adminSupabase
+      .from('pos_transactions')
+      .select('transaction_number')
+      .like('transaction_number', `POS-${today}-%`)
+      .order('transaction_number', { ascending: false })
+      .limit(1);
+
+    let sequence = 1;
+    if (lastTransaction && lastTransaction.length > 0) {
+      const lastNumber = lastTransaction[0].transaction_number;
+      const sequenceMatch = lastNumber?.match(/POS-\d{4}-\d{2}-\d{2}-(\d+)/);
+      if (sequenceMatch) {
+        sequence = parseInt(sequenceMatch[1]) + 1;
+      }
+    }
+    const transactionNumber = `POS-${today}-${sequence.toString().padStart(4, '0')}`;
+
+    // Calcular totales
+    let subtotal = 0;
+    let discountTotal = 0;
+
+    // Verificar stock disponible para todos los productos
+    for (const item of items) {
+      const { data: product } = await adminSupabase
+        .from('inventory')
+        .select('id, name, quantity, unit_price')
+        .eq('id', item.inventory_id)
+        .single();
+
+      if (!product) {
+        return { success: false, error: `Producto no encontrado: ${item.inventory_id}` };
+      }
+
+      if (product.quantity < item.quantity) {
+        return { success: false, error: `Stock insuficiente para ${product.name}. Disponible: ${product.quantity}, Solicitado: ${item.quantity}` };
+      }
+
+      subtotal += item.unit_price * item.quantity;
+      discountTotal += item.discount;
+    }
+
+    const taxRate = 0.16; // 16% IVA
+    const taxAmount = (subtotal - discountTotal) * taxRate;
+    const totalAmount = subtotal - discountTotal + taxAmount;
+
+    // Iniciar transacción de base de datos
+    await adminSupabase.rpc('BEGIN_TRANSACTION');
+
+    try {
+      // Crear registro de transacción POS
+      const { data: transaction, error: transactionError } = await adminSupabase
+        .from('pos_transactions')
+        .insert({
+          transaction_number: transactionNumber,
+          status: 'COMPLETED',
+          payment_method: paymentMethod,
+          subtotal: subtotal,
+          discount_total: discountTotal,
+          tax_amount: taxAmount,
+          total_amount: totalAmount,
+          items_count: items.reduce((sum, item) => sum + item.quantity, 0),
+          customer_name: customerName || null,
+          notes: notes || null,
+          operator_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (transactionError) {
+        throw transactionError;
+      }
+
+      // Crear items de transacción y actualizar inventario
+      for (const item of items) {
+        const itemSubtotal = (item.unit_price * item.quantity) - item.discount;
+
+        // Insertar item de transacción
+        const { error: itemError } = await adminSupabase
+          .from('pos_transaction_items')
+          .insert({
+            transaction_id: transaction.id,
+            inventory_id: item.inventory_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount: item.discount,
+            subtotal: itemSubtotal,
+          });
+
+        if (itemError) {
+          throw itemError;
+        }
+
+        // Actualizar inventario
+        const { data: product } = await adminSupabase
+          .from('inventory')
+          .select('quantity')
+          .eq('id', item.inventory_id)
+          .single();
+
+        if (product) {
+          const newQuantity = product.quantity - item.quantity;
+
+          const { error: updateError } = await adminSupabase
+            .from('inventory')
+            .update({ quantity: newQuantity })
+            .eq('id', item.inventory_id);
+
+          if (updateError) {
+            throw updateError;
+          }
+
+          // Registrar movimiento de inventario
+          const { error: movementError } = await adminSupabase
+            .from('inventory_transactions')
+            .insert({
+              inventory_id: item.inventory_id,
+              transaction_type: 'out',
+              quantity: item.quantity,
+              previous_quantity: product.quantity,
+              new_quantity: newQuantity,
+              notes: `Venta POS: ${transactionNumber}`,
+              reference_type: 'pos_sale',
+              reference_id: transaction.id,
+              performed_by: user.id,
+            });
+
+          if (movementError) {
+            throw movementError;
+          }
+        }
+      }
+
+      // Hacer commit de la transacción
+      await adminSupabase.rpc('COMMIT_TRANSACTION');
+
+      revalidatePath('/dashboard/pharmacy');
+      revalidatePath('/dashboard/pharmacy/pos');
+      revalidatePath('/dashboard/pharmacy/inventory');
+
+      return {
+        success: true,
+        transaction_id: transaction.id,
+        transaction_number: transactionNumber,
+      };
+    } catch (error) {
+      // Hacer rollback en caso de error
+      await adminSupabase.rpc('ROLLBACK_TRANSACTION');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error al procesar venta POS:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error al procesar la venta' };
+  }
+}
+
+/**
+ * Obtiene productos disponibles para el POS (solo con stock > 0)
+ */
+export async function getPOSProducts(search?: string): Promise<PharmacyProduct[]> {
+  const adminSupabase = createAdminClient();
+
+  let query = adminSupabase
+    .from('inventory')
+    .select('*')
+    .eq('is_active', true)
+    .gt('quantity', 0);
+
+  if (search && search.trim()) {
+    query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%,description.ilike.%${search}%`);
+  }
+
+  query = query.order('name', { ascending: true }).limit(100);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error al obtener productos POS:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Obtiene el stock actual de un producto para verificación en tiempo real
+ */
+export async function getProductStock(productId: string): Promise<number> {
+  const adminSupabase = createAdminClient();
+
+  const { data, error } = await adminSupabase
+    .from('inventory')
+    .select('quantity')
+    .eq('id', productId)
+    .single();
+
+  if (error || !data) {
+    return 0;
+  }
+
+  return data.quantity;
+}
+
+/**
+ * Obtiene transacciones POS por fecha
+ */
+export async function getPOSTransactions(
+  startDate?: string,
+  endDate?: string,
+  limit: number = 50
+): Promise<POSTransaction[]> {
+  const adminSupabase = createAdminClient();
+
+  let query = adminSupabase
+    .from('pos_transactions')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (startDate) {
+    query = query.gte('created_at', startDate);
+  }
+
+  if (endDate) {
+    query = query.lte('created_at', endDate);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error al obtener transacciones POS:', error);
+    return [];
+  }
+
+  // Obtener items para cada transacción
+  const transactions = data || [];
+
+  for (const tx of transactions) {
+    const { data: items } = await adminSupabase
+      .from('pos_transaction_items')
+      .select('*')
+      .eq('transaction_id', tx.id);
+
+    tx.items = items || [];
+  }
+
+  return transactions;
+}
+
+/**
+ * Obtiene estadísticas del POS para el día actual
+ */
+export async function getPOSStats(): Promise<POSStats> {
+  const adminSupabase = createAdminClient();
+
+  const today = new Date().toISOString().split('T')[0];
+  const startOfDay = `${today}T00:00:00`;
+  const endOfDay = `${today}T23:59:59`;
+
+  // Obtener transacciones del día
+  const { data: transactions, error } = await adminSupabase
+    .from('pos_transactions')
+    .select('total_amount')
+    .gte('created_at', startOfDay)
+    .lte('created_at', endOfDay)
+    .eq('status', 'COMPLETED');
+
+  if (error) {
+    console.error('Error al obtener estadísticas POS:', error);
+    return {
+      totalSalesToday: 0,
+      transactionCountToday: 0,
+      averageTicket: 0,
+      topSellingProducts: [],
+    };
+  }
+
+  const transactionCount = transactions?.length || 0;
+  const totalSales = transactions?.reduce((sum, tx) => sum + tx.total_amount, 0) || 0;
+  const averageTicket = transactionCount > 0 ? totalSales / transactionCount : 0;
+
+  // Obtener productos más vendidos hoy
+  const { data: topItems } = await adminSupabase
+    .from('pos_transaction_items')
+    .select(`
+      inventory_id,
+      name,
+      quantity,
+      subtotal
+    `)
+    .gte('created_at', startOfDay)
+    .lte('created_at', endOfDay);
+
+  const productSales: Record<string, { name: string; quantity_sold: number; revenue: number }> = {};
+
+  if (topItems) {
+    for (const item of topItems) {
+      if (!productSales[item.inventory_id]) {
+        productSales[item.inventory_id] = {
+          name: item.name,
+          quantity_sold: 0,
+          revenue: 0,
+        };
+      }
+      productSales[item.inventory_id].quantity_sold += item.quantity;
+      productSales[item.inventory_id].revenue += item.subtotal;
+    }
+  }
+
+  const topSellingProducts = Object.values(productSales)
+    .sort((a, b) => b.quantity_sold - a.quantity_sold)
+    .slice(0, 5);
+
+  return {
+    totalSalesToday: totalSales,
+    transactionCountToday: transactionCount,
+    averageTicket: averageTicket,
+    topSellingProducts: topSellingProducts,
+  };
+}
+
+/**
+ * Cancela una transacción POS (revierte el inventario)
+ */
+export async function cancelPOSTransaction(
+  transactionId: string,
+  reason: string
+): Promise<{ success: boolean; error?: string }> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Obtener la transacción actual
+    const { data: transaction, error: txError } = await adminSupabase
+      .from('pos_transactions')
+      .select('*')
+      .eq('id', transactionId)
+      .single();
+
+    if (txError || !transaction) {
+      return { success: false, error: 'Transacción no encontrada' };
+    }
+
+    if (transaction.status !== 'COMPLETED') {
+      return { success: false, error: 'La transacción no puede ser cancelada' };
+    }
+
+    // Obtener items de la transacción
+    const { data: items, error: itemsError } = await adminSupabase
+      .from('pos_transaction_items')
+      .select('*')
+      .eq('transaction_id', transactionId);
+
+    if (itemsError) {
+      return { success: false, error: itemsError.message };
+    }
+
+    // Iniciar transacción
+    await adminSupabase.rpc('BEGIN_TRANSACTION');
+
+    try {
+      // Actualizar estado de la transacción
+      const { error: updateError } = await adminSupabase
+        .from('pos_transactions')
+        .update({
+          status: 'CANCELLED',
+          notes: `Cancelada: ${reason}. Original: ${transaction.notes || ''}`,
+        })
+        .eq('id', transactionId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Restaurar inventario para cada item
+      for (const item of items || []) {
+        const { data: product } = await adminSupabase
+          .from('inventory')
+          .select('id, quantity')
+          .eq('id', item.inventory_id)
+          .single();
+
+        if (product) {
+          const newQuantity = product.quantity + item.quantity;
+
+          const { error: invError } = await adminSupabase
+            .from('inventory')
+            .update({ quantity: newQuantity })
+            .eq('id', item.inventory_id);
+
+          if (invError) {
+            throw invError;
+          }
+
+          // Registrar movimiento de restauración
+          const { error: movementError } = await adminSupabase
+            .from('inventory_transactions')
+            .insert({
+              inventory_id: item.inventory_id,
+              transaction_type: 'return',
+              quantity: item.quantity,
+              previous_quantity: product.quantity,
+              new_quantity: newQuantity,
+              notes: `Cancelación POS: ${transaction.transaction_number}. Motivo: ${reason}`,
+              reference_type: 'pos_cancellation',
+              reference_id: transactionId,
+              performed_by: user.id,
+            });
+
+          if (movementError) {
+            throw movementError;
+          }
+        }
+      }
+
+      await adminSupabase.rpc('COMMIT_TRANSACTION');
+
+      revalidatePath('/dashboard/pharmacy/pos');
+      revalidatePath('/dashboard/pharmacy/inventory');
+
+      return { success: true };
+    } catch (error) {
+      await adminSupabase.rpc('ROLLBACK_TRANSACTION');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error al cancelar transacción POS:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Error al cancelar la transacción' };
+  }
 }
