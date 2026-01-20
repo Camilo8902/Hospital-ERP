@@ -57,6 +57,15 @@
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
   }
+
+  /* Prevent horizontal scroll on mobile */
+  html {
+    overflow-x: hidden;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
 }
 
 @layer components {
@@ -83,19 +92,19 @@
   }
   
   .btn-sm {
-    @apply px-3 py-1.5 text-sm;
+    @apply px-3 py-1.5 text-sm min-h-[36px];
   }
   
   .btn-md {
-    @apply px-4 py-2 text-sm;
+    @apply px-4 py-2 text-sm min-h-[40px];
   }
   
   .btn-lg {
-    @apply px-6 py-3 text-base;
+    @apply px-6 py-3 text-base min-h-[48px];
   }
   
   .input {
-    @apply flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
+    @apply flex h-10 sm:h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
            placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500
            focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -113,15 +122,15 @@
   }
   
   .card-header {
-    @apply px-6 py-4 border-b border-gray-200;
+    @apply px-4 sm:px-6 py-4 border-b border-gray-200;
   }
   
   .card-body {
-    @apply px-6 py-4;
+    @apply px-4 sm:px-6 py-4;
   }
   
   .card-footer {
-    @apply px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl;
+    @apply px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl;
   }
   
   .badge {
@@ -157,11 +166,11 @@
   }
   
   .table th {
-    @apply bg-gray-50 px-4 py-3 text-left font-semibold text-gray-700 border-b;
+    @apply bg-gray-50 px-3 sm:px-4 py-3 text-left font-semibold text-gray-700 border-b whitespace-nowrap;
   }
   
   .table td {
-    @apply px-4 py-3 border-b border-gray-100;
+    @apply px-3 sm:px-4 py-3 border-b border-gray-100;
   }
   
   .table tr:hover td {
@@ -169,7 +178,7 @@
   }
   
   .sidebar-link {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-gray-600
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-gray-600
            transition-all hover:text-gray-900 hover:bg-gray-100;
   }
   
@@ -200,5 +209,60 @@
   
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: #9ca3af;
+  }
+
+  /* Animaciones */
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Touch manipulation para mejor experiencia mobile */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Asegurar que los inputs no hagan zoom en iOS */
+  @supports (-webkit-touch-callout: none) {
+    input, select, textarea {
+      font-size: 16px;
+    }
+  }
+
+  /* Responsive grid utilities */
+  .grid-responsive {
+    @apply grid gap-4 sm:gap-6;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 640px) {
+    .grid-responsive {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .grid-responsive {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  /* Card view para tablas en mobile */
+  .table-card-view {
+    @apply block lg:hidden;
+  }
+
+  .table-traditional {
+    @apply hidden lg:table;
   }
 }

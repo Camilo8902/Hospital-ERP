@@ -7,7 +7,6 @@ import SearchInput from './SearchInput';
 import Link from 'next/link';
 import { Plus, Calendar, Clock, CheckCircle2, XCircle, Play } from 'lucide-react';
 
-// Forzar que siempre obtenga datos frescos (sin caché)
 export const dynamic = 'force-dynamic';
 
 export default async function AppointmentsPage({
@@ -20,15 +19,12 @@ export default async function AppointmentsPage({
   const view = searchParams.view || 'grid';
   const searchTerm = searchParams.search || '';
   
-  // Verificar si es una fecha específica (formato YYYY-MM-DD)
   const specificDateRegex = /^\d{4}-\d{2}-\d{2}$/;
   const isSpecificDate = specificDateRegex.test(dateFilter);
   const specificDate = isSpecificDate ? dateFilter : undefined;
 
-  // Usar el cliente admin para obtener citas
   const appointments = await getAppointments(dateFilter, status, specificDate);
 
-  // Aplicar filtro de búsqueda si existe
   let filteredAppointments = appointments;
   if (searchTerm.trim()) {
     const searchLower = searchTerm.toLowerCase();
@@ -51,28 +47,12 @@ export default async function AppointmentsPage({
     });
   }
 
-  // Contadores para estadísticas
   const stats = {
     scheduled: filteredAppointments?.filter(a => a.status === 'scheduled').length || 0,
     in_progress: filteredAppointments?.filter(a => a.status === 'in_progress').length || 0,
     completed: filteredAppointments?.filter(a => a.status === 'completed').length || 0,
     cancelled: filteredAppointments?.filter(a => a.status === 'cancelled').length || 0,
     total: filteredAppointments?.length || 0,
-  };
-
-  const statusLabels: Record<string, string> = {
-    scheduled: 'Programadas',
-    in_progress: 'En Progreso',
-    completed: 'Completadas',
-    cancelled: 'Canceladas',
-    no_show: 'No se presentó',
-  };
-
-  const dateLabels: Record<string, string> = {
-    today: 'Hoy',
-    week: 'Esta semana',
-    upcoming: 'Próximas',
-    all: 'Todas',
   };
 
   const formatSelectedDate = (dateStr: string | undefined) => {
@@ -86,145 +66,91 @@ export default async function AppointmentsPage({
     });
   };
 
+  const statCards = [
+    { key: 'total', icon: Calendar, color: 'blue', label: 'Total' },
+    { key: 'in_progress', icon: Play, color: 'amber', label: 'En Progreso' },
+    { key: 'completed', icon: CheckCircle2, color: 'green', label: 'Completadas' },
+    { key: 'cancelled', icon: XCircle, color: 'red', label: 'Canceladas' },
+    { key: 'scheduled', icon: Clock, color: 'primary', label: 'Pendientes' },
+  ];
+
+  const colorClasses: Record<string, { bg: string; text: string; border: string }> = {
+    blue: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+    amber: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    green: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+    red: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+    primary: { bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-200' },
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Citas Médicas</h1>
-          <p className="text-gray-500 mt-1">Gestiona y visualiza todas las citas programadas</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Citas Médicas</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Gestiona y visualiza todas las citas</p>
         </div>
-        <Link href="/dashboard/appointments/new" className="btn-primary btn-md">
+        <Link href="/dashboard/appointments/new" className="btn-primary btn-md w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4 mr-2" />
           Nueva Cita
         </Link>
       </div>
 
-      {/* Stats overview */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="card p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-blue-700">{stats.total}</p>
-              <p className="text-xs text-blue-600 font-medium">Total Citas</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4 bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center">
-              <Play className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-amber-700">{stats.in_progress}</p>
-              <p className="text-xs text-amber-600 font-medium">En Progreso</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-700">{stats.completed}</p>
-              <p className="text-xs text-green-600 font-medium">Completadas</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4 bg-gradient-to-br from-red-50 to-red-100 border-red-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center">
-              <XCircle className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-red-700">{stats.cancelled}</p>
-              <p className="text-xs text-red-600 font-medium">Canceladas</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4 bg-gradient-to-br from-primary-50 to-primary-100 border-primary-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-primary-700">{stats.scheduled}</p>
-              <p className="text-xs text-primary-600 font-medium">Pendientes</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters and View Toggle */}
-      <div className="card">
-        <div className="card-body">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Search and Date filters */}
-            <div className="flex flex-wrap gap-4">
-              {/* Search input */}
-              <SearchInput 
-                currentView={view}
-                currentDate={dateFilter}
-                status={status}
-              />
-
-              {/* Date tabs */}
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-700">Período</label>
-                <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-                  {[
-                    { value: 'today', label: 'Hoy' },
-                    { value: 'week', label: 'Esta semana' },
-                    { value: 'upcoming', label: 'Próximas' },
-                    { value: 'all', label: 'Todas' },
-                  ].map((filter) => (
-                    <Link
-                      key={filter.value}
-                      href={`/dashboard/appointments?date=${filter.value}&status=${status}&view=${view}` + (searchTerm ? `&search=${searchTerm}` : '')}
-                      className={`px-4 py-2 text-sm rounded-md transition-all ${
-                        dateFilter === filter.value && !isSpecificDate
-                          ? 'bg-white text-gray-900 shadow-sm font-medium'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      {filter.label}
-                    </Link>
-                  ))}
+      {/* Stats overview - Grid responsive */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
+        {statCards.map((stat) => {
+          const Icon = stat.icon;
+          const colors = colorClasses[stat.color];
+          return (
+            <div key={stat.key} className={`card p-3 sm:p-4 ${colors.bg} ${colors.border}`}>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-${stat.color}-500 flex items-center justify-center flex-shrink-0`}>
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-xl sm:text-2xl font-bold ${colors.text}`}>{stats[stat.key as keyof typeof stats]}</p>
+                  <p className={`text-xs ${colors.text} font-medium truncate`}>{stat.label}</p>
                 </div>
               </div>
+            </div>
+          );
+        })}
+      </div>
 
-              {/* Calendar filter */}
-              <CalendarFilter 
-                currentDate={specificDate}
-                currentFilter={dateFilter}
-                status={status}
-                searchTerm={searchTerm}
-              />
+      {/* Filters */}
+      <div className="card">
+        <div className="card-body py-3 sm:py-4">
+          <div className="space-y-3">
+            {/* Search */}
+            <SearchInput 
+              currentView={view}
+              currentDate={dateFilter}
+              status={status}
+            />
+
+            {/* Date tabs */}
+            <div className="flex overflow-x-auto gap-1 bg-gray-100 p-1 rounded-lg scrollbar-thin">
+              {[
+                { value: 'today', label: 'Hoy' },
+                { value: 'week', label: 'Esta semana' },
+                { value: 'upcoming', label: 'Próximas' },
+                { value: 'all', label: 'Todas' },
+              ].map((filter) => (
+                <Link
+                  key={filter.value}
+                  href={`/dashboard/appointments?date=${filter.value}&status=${status}&view=${view}` + (searchTerm ? `&search=${searchTerm}` : '')}
+                  className={`px-3 py-2 text-xs sm:text-sm rounded-md transition-all whitespace-nowrap ${
+                    dateFilter === filter.value && !isSpecificDate
+                      ? 'bg-white text-gray-900 shadow-sm font-medium'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {filter.label}
+                </Link>
+              ))}
             </div>
 
-            {/* View Toggle */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">Vista</label>
-              <ViewToggle 
-                currentView={view}
-                currentDate={dateFilter}
-                status={status}
-                searchTerm={searchTerm}
-              />
-            </div>
-          </div>
-
-          {/* Status filters */}
-          <div className="flex flex-col gap-2 mt-4">
-            <label className="text-sm font-medium text-gray-700">Estado</label>
+            {/* Status filters */}
             <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-lg">
               {[
                 { value: 'all', label: 'Todos' },
@@ -236,7 +162,7 @@ export default async function AppointmentsPage({
                 <Link
                   key={filter.value}
                   href={`/dashboard/appointments?date=${dateFilter}&status=${filter.value}&view=${view}` + (searchTerm ? `&search=${searchTerm}` : '')}
-                  className={`px-4 py-2 text-sm rounded-md transition-all ${
+                  className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-all ${
                     status === filter.value
                       ? 'bg-white text-gray-900 shadow-sm font-medium'
                       : 'text-gray-600 hover:text-gray-900'
@@ -246,25 +172,41 @@ export default async function AppointmentsPage({
                 </Link>
               ))}
             </div>
+
+            {/* Selected date info */}
+            {isSpecificDate && (
+              <div className="p-2.5 bg-primary-50 border border-primary-200 rounded-lg">
+                <p className="text-sm text-primary-700">
+                  <strong>Mostrando para:</strong> {formatSelectedDate(specificDate)}
+                </p>
+              </div>
+            )}
+
+            {/* Search results info */}
+            {searchTerm && (
+              <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  <strong>Resultados para:</strong> "{searchTerm}" ({filteredAppointments.length} citas)
+                </p>
+              </div>
+            )}
+
+            {/* Calendar and View toggle row */}
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center sm:justify-between pt-2">
+              <CalendarFilter 
+                currentDate={specificDate}
+                currentFilter={dateFilter}
+                status={status}
+                searchTerm={searchTerm}
+              />
+              <ViewToggle 
+                currentView={view}
+                currentDate={dateFilter}
+                status={status}
+                searchTerm={searchTerm}
+              />
+            </div>
           </div>
-
-          {/* Selected date info */}
-          {isSpecificDate && (
-            <div className="mt-3 p-3 bg-primary-50 border border-primary-200 rounded-lg">
-              <p className="text-sm text-primary-700">
-                <strong>Mostrando citas para:</strong> {formatSelectedDate(specificDate)}
-              </p>
-            </div>
-          )}
-
-          {/* Search results info */}
-          {searchTerm && (
-            <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-sm text-gray-700">
-                <strong>Resultados para:</strong> "{searchTerm}" ({filteredAppointments.length} citas encontradas)
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -272,8 +214,7 @@ export default async function AppointmentsPage({
       {filteredAppointments && filteredAppointments.length > 0 ? (
         <>
           {view === 'grid' ? (
-            /* Vista de tarjetas */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {filteredAppointments.map((appointment) => (
                 <AppointmentCard 
                   key={appointment.id} 
@@ -282,7 +223,6 @@ export default async function AppointmentsPage({
               ))}
             </div>
           ) : (
-            /* Vista de lista */
             <div className="space-y-3">
               {filteredAppointments.map((appointment) => (
                 <AppointmentListItem 
@@ -294,20 +234,20 @@ export default async function AppointmentsPage({
           )}
         </>
       ) : (
-        <div className="card p-16 text-center">
-          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gray-100 flex items-center justify-center">
-            <Calendar className="w-12 h-12 text-gray-400" />
+        <div className="card p-8 sm:p-16 text-center">
+          <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 sm:mb-6 rounded-full bg-gray-100 flex items-center justify-center">
+            <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
             {searchTerm ? 'No se encontraron resultados' : 'No hay citas'}
           </h3>
-          <p className="text-gray-500 mb-6 max-w-md mx-auto">
+          <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm sm:text-base">
             {searchTerm 
               ? `No se encontraron citas que coincidan con "${searchTerm}".`
               : isSpecificDate
-              ? `No hay citas programadas para el ${formatSelectedDate(specificDate)}.`
+              ? `No hay citas para el ${formatSelectedDate(specificDate)}.`
               : dateFilter === 'today'
-              ? 'No hay citas programadas para el día de hoy.'
+              ? 'No hay citas para hoy.'
               : 'No se encontraron citas con los filtros seleccionados.'}
           </p>
           {searchTerm ? (
@@ -328,25 +268,20 @@ export default async function AppointmentsPage({
 
       {/* Quick legend */}
       <div className="card">
-        <div className="card-body">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Guía de estados</h4>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <span className="text-sm text-gray-600">Programada - Cita pendiente</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-              <span className="text-sm text-gray-600">En Progreso - Cita en curso</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span className="text-sm text-gray-600">Completada - Cita finalizada</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span className="text-sm text-gray-600">Cancelada - Cita anulada</span>
-            </div>
+        <div className="card-body py-3">
+          <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">Guía de estados</h4>
+          <div className="flex flex-wrap gap-2 sm:gap-4">
+            {[
+              { color: 'bg-blue-500', label: 'Programada' },
+              { color: 'bg-amber-500', label: 'En Progreso' },
+              { color: 'bg-green-500', label: 'Completada' },
+              { color: 'bg-red-500', label: 'Cancelada' },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center gap-1.5 sm:gap-2">
+                <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${item.color}`} />
+                <span className="text-xs sm:text-sm text-gray-600">{item.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
