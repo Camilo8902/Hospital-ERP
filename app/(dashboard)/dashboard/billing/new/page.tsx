@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
-import { createInvoice, getUnbilledItems } from '@/lib/actions/payments';
+import { createInvoice, getUnbilledItems, UnbilledItem } from '@/lib/actions/payments';
 import { searchPatients, getPatients } from '@/lib/actions/patients';
 import { ArrowLeft, Plus, Trash2, Save, FileText, Calendar, User, DollarSign, Calculator, AlertCircle, CheckCircle, Search, FlaskConical, ShoppingCart, Loader2 } from 'lucide-react';
 import type { Patient } from '@/lib/types';
@@ -14,15 +14,6 @@ interface InvoiceItem {
   unit_price: number;
   source_type?: string;
   source_id?: string;
-}
-
-interface UnbilledItem {
-  id: string;
-  type: 'lab_order' | 'appointment' | 'pos_sale' | 'manual';
-  description: string;
-  date: string;
-  amount: number;
-  details?: string;
 }
 
 export default function NewInvoicePage() {
@@ -407,7 +398,7 @@ export default function NewInvoicePage() {
                         {item.type === 'lab_order' && (
                           <FlaskConical className="w-5 h-5 text-purple-500" />
                         )}
-                        {item.type === 'pos_sale' && (
+                        {item.type === 'inventory' && (
                           <ShoppingCart className="w-5 h-5 text-green-500" />
                         )}
                         <div>

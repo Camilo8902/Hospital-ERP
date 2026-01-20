@@ -27,6 +27,17 @@ interface StripeRefund {
 // TIPOS BASADOS EN EL ESQUEMA SQL
 // ============================================
 
+interface InvoiceItemData {
+  id?: string;
+  description: string;
+  service_code?: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  source_type?: string;
+  source_id?: string;
+}
+
 interface Invoice {
   id: string;
   invoice_number: string;
@@ -40,18 +51,21 @@ interface Invoice {
   amount_paid: number;
   payment_method: string | null;
   payment_reference: string | null;
-  items: Array<{
-    id?: string;
-    description: string;
-    service_code?: string;
-    quantity: number;
-    unit_price: number;
-    total: number;
-  }>;
+  items: InvoiceItemData[];
+  notes: string | null;
   due_date: string;
   issued_date: string;
   paid_date: string | null;
   created_at: string;
+  patients?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+    email: string;
+    insurance_provider: string | null;
+    insurance_policy_number: string | null;
+  };
 }
 
 interface LabOrder {
@@ -205,6 +219,55 @@ export async function getInvoiceById(invoiceId: string): Promise<Invoice | null>
   } catch (error) {
     console.error('Error al obtener factura:', error);
     return null;
+  }
+}
+
+export async function cancelInvoice(invoiceId: string): Promise<{ success: boolean; error?: string }> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Verificar que la factura existe y está en estado 'pending'
+    const { data: invoice, error: invoiceError } = await adminSupabase
+      .from('invoices')
+      .select('id, status, patient_id')
+      .eq('id', invoiceId)
+      .single();
+
+    if (invoiceError || !invoice) {
+      return { success: false, error: 'Factura no encontrada' };
+    }
+
+    if (invoice.status !== 'pending') {
+      return { success: false, error: 'Solo se pueden cancelar facturas en estado pendiente' };
+    }
+
+    // Actualizar estado de la factura a 'cancelled'
+    const { error: updateError } = await adminSupabase
+      .from('invoices')
+      .update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', invoiceId);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    revalidatePath('/dashboard/billing');
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error al cancelar factura:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al cancelar factura' 
+    };
   }
 }
 
@@ -702,6 +765,19 @@ export async function createInvoice(invoiceData: CreateInvoiceDTO): Promise<Crea
       return { success: false, error: 'Error al crear la factura' };
     }
 
+    // Marcar items como facturados (excepto los manuales)
+    const billedItems = invoiceData.items
+      .filter(item => item.source_type && item.source_id)
+      .map(item => ({
+        type: item.source_type!,
+        id: item.source_id!,
+        invoiceId: invoice.id
+      }));
+
+    if (billedItems.length > 0) {
+      await markItemsAsBilled(billedItems);
+    }
+
     revalidatePath('/dashboard/billing');
 
     return {
@@ -718,56 +794,28 @@ export async function createInvoice(invoiceData: CreateInvoiceDTO): Promise<Crea
 }
 
 // ============================================
-// CANCELAR FACTURA
-// ============================================
-
-export async function cancelInvoice(
-  invoiceId: string
-): Promise<{ success: boolean; error?: string }> {
-  const adminSupabase = createAdminClient();
-
-  try {
-    const { error: updateError } = await adminSupabase
-      .from('invoices')
-      .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', invoiceId);
-
-    if (updateError) {
-      return { success: false, error: updateError.message };
-    }
-
-    revalidatePath('/dashboard/billing');
-    revalidatePath(`/dashboard/billing/${invoiceId}`);
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error al cancelar factura:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error al cancelar la factura' 
-    };
-  }
-}
-
-// ============================================
 // OBTENER ITEMS NO FACTURADOS (PARA INTEGRACIÓN)
 // ============================================
 
 export interface UnbilledItem {
   id: string;
-  type: 'lab_order' | 'appointment' | 'pos_sale' | 'manual';
+  type: 'lab_order' | 'appointment' | 'inventory' | 'prescription' | 'manual';
   description: string;
   date: string;
   amount: number;
   details?: string;
+  source_data?: Record<string, unknown>;
 }
+
+type GetUnbilledItemsResult = {
+  success: boolean;
+  items?: UnbilledItem[];
+  error?: string;
+};
 
 export async function getUnbilledItems(
   patientId: string
-): Promise<{ success: boolean; items?: UnbilledItem[]; error?: string }> {
+): Promise<GetUnbilledItemsResult> {
   const adminSupabase = createAdminClient();
 
   try {
@@ -776,7 +824,7 @@ export async function getUnbilledItems(
     // 1. Buscar órdenes de laboratorio no pagadas
     const { data: labOrders, error: labError } = await adminSupabase
       .from('lab_orders')
-      .select('id, order_number, total_amount, created_at, payment_status')
+      .select('id, order_number, total_amount, created_at, payment_status, doctor_id, appointment_id')
       .eq('patient_id', patientId)
       .neq('payment_status', 'paid')
       .order('created_at', { ascending: false });
@@ -784,66 +832,167 @@ export async function getUnbilledItems(
     if (labError) {
       console.error('Error al obtener órdenes de laboratorio:', labError);
     } else if (labOrders) {
-      labOrders.forEach(order => {
+      for (const order of labOrders) {
+        const { count } = await adminSupabase
+          .from('lab_order_details')
+          .select('id', { count: 'exact', head: true })
+          .eq('order_id', order.id);
+        
         unbilledItems.push({
           id: order.id,
           type: 'lab_order',
           description: `Orden de Laboratorio #${order.order_number}`,
           date: order.created_at,
           amount: Number(order.total_amount) || 0,
-          details: `Estado de pago: ${order.payment_status}`
+          details: `${count || 0} prueba(s) • Estado: ${order.payment_status}`,
+          source_data: {
+            order_number: order.order_number,
+            appointment_id: order.appointment_id,
+            doctor_id: order.doctor_id
+          }
         });
-      });
+      }
     }
 
-    // 2. Buscar citas médicas no facturadas
-    // Descomentar cuando se agregue el campo billing_status a appointments
-    /*
+    // 2. Buscar citas médicas completadas sin factura asociada
     const { data: appointments, error: apptError } = await adminSupabase
       .from('appointments')
-      .select('id, appointment_date, total_amount, status')
+      .select(`
+        id,
+        start_time,
+        end_time,
+        appointment_type,
+        status,
+        reason,
+        doctor_id,
+        departments!inner(name)
+      `)
       .eq('patient_id', patientId)
       .eq('status', 'completed')
-      .is('billing_status', null)
-      .order('appointment_date', { ascending: false });
+      .order('start_time', { ascending: false });
 
     if (apptError) {
       console.error('Error al obtener citas:', apptError);
     } else if (appointments) {
-      appointments.forEach(appt => {
-        unbilledItems.push({
-          id: appt.id,
-          type: 'appointment',
-          description: `Consulta Médica`,
-          date: appt.appointment_date,
-          amount: Number(appt.total_amount) || 0,
-          details: `Fecha: ${appt.appointment_date}`
-        });
-      });
-    }
-    */
+      for (const appt of appointments) {
+        const { data: invoiceData } = await adminSupabase
+          .from('invoices')
+          .select('id')
+          .eq('appointment_id', appt.id)
+          .single();
 
-    // 3. Buscar ventas de POS no asociadas a factura
-    const { data: posSales, error: posError } = await adminSupabase
-      .from('pos_sales')
-      .select('id, sale_number, total_amount, created_at')
-      .eq('patient_id', patientId)
-      .is('invoice_id', null)
+        if (!invoiceData) {
+          const appointmentPrices: Record<string, number> = {
+            consultation: 100,
+            follow_up: 50,
+            emergency: 200,
+            procedure: 150,
+            imaging: 120,
+            laboratory: 80,
+            surgery: 500
+          };
+          
+          const basePrice = appointmentPrices[appt.appointment_type] || 100;
+          
+          unbilledItems.push({
+            id: appt.id,
+            type: 'appointment',
+            description: `Consulta: ${appt.appointment_type.replace('_', ' ')}`,
+            date: appt.start_time,
+            amount: basePrice,
+            details: `${appt.departments?.[0]?.name || 'General'} • ${new Date(appt.start_time).toLocaleDateString()}`,
+            source_data: {
+              appointment_type: appt.appointment_type,
+              department: appt.departments?.[0]?.name,
+              reason: appt.reason,
+              doctor_id: appt.doctor_id
+            }
+          });
+        }
+      }
+    }
+
+    // 3. Buscar ventas de inventario (medicamentos) no facturadas
+    const { data: inventorySales, error: invError } = await adminSupabase
+      .from('inventory_transactions')
+      .select(`
+        id,
+        inventory_id,
+        quantity,
+        previous_quantity,
+        new_quantity,
+        created_at,
+        reference_type,
+        reference_id,
+        inventory!inner(name, unit_price, category)
+      `)
+      .eq('transaction_type', 'sale')
       .order('created_at', { ascending: false });
 
-    if (posError) {
-      console.error('Error al obtener ventas POS:', posError);
-    } else if (posSales) {
-      posSales.forEach(sale => {
+    if (invError) {
+      console.error('Error al obtener ventas de inventario:', invError);
+    } else if (inventorySales) {
+      for (const sale of inventorySales) {
+        const inventory = sale.inventory?.[0] as Record<string, unknown> | undefined;
+        if (!inventory) continue;
+        const amount = (inventory.unit_price as number) * Math.abs(sale.quantity);
+        const category = inventory.category as string;
+        
+        if (category === 'medication' || category === 'consumables' || category === 'lab_supplies') {
+          unbilledItems.push({
+            id: sale.id,
+            type: 'inventory',
+            description: `${inventory.name} (x${Math.abs(sale.quantity)} ${inventory.unit})`,
+            date: sale.created_at,
+            amount: amount,
+            details: `${category} • Venta`,
+            source_data: {
+              inventory_id: sale.inventory_id,
+              category: category,
+              quantity: sale.quantity
+            }
+          });
+        }
+      }
+    }
+
+    // 4. Buscar prescripciones pendientes de cobro
+    const { data: prescriptions, error: presError } = await adminSupabase
+      .from('prescriptions')
+      .select(`
+        id,
+        medication_name,
+        quantity_prescribed,
+        quantity_dispensed,
+        status,
+        prescribed_date,
+        unit_price
+      `)
+      .eq('patient_id', patientId)
+      .eq('status', 'pending')
+      .order('prescribed_date', { ascending: false });
+
+    if (presError) {
+      console.error('Error al obtener prescripciones:', presError);
+    } else if (prescriptions) {
+      for (const pres of prescriptions) {
+        const unitPrice = pres.unit_price || 25;
+        const totalAmount = unitPrice * pres.quantity_prescribed;
+        
         unbilledItems.push({
-          id: sale.id,
-          type: 'pos_sale',
-          description: `Venta Farmacia #${sale.sale_number}`,
-          date: sale.created_at,
-          amount: Number(sale.total_amount) || 0,
-          details: `Venta en mostrador`
+          id: pres.id,
+          type: 'prescription',
+          description: `Medicamento: ${pres.medication_name}`,
+          date: pres.prescribed_date,
+          amount: totalAmount,
+          details: `${pres.quantity_prescribed} unidades • ${pres.status}`,
+          source_data: {
+            medication_name: pres.medication_name,
+            quantity: pres.quantity_prescribed,
+            status: pres.status
+          }
         });
-      });
+      }
     }
 
     return {
@@ -855,6 +1004,601 @@ export async function getUnbilledItems(
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Error al obtener items' 
+    };
+  }
+}
+
+// ============================================
+// MARCAR ITEMS COMO FACTURADOS
+// ============================================
+
+export async function markItemsAsBilled(
+  items: Array<{ type: string; id: string; invoiceId: string }>
+): Promise<{ success: boolean; error?: string }> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    for (const item of items) {
+      switch (item.type) {
+        case 'lab_order':
+          await adminSupabase
+            .from('lab_orders')
+            .update({
+              payment_status: 'invoiced',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', item.id);
+          break;
+        case 'appointment':
+          await adminSupabase
+            .from('appointments')
+            .update({
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', item.id);
+          break;
+        case 'inventory':
+          break;
+        case 'prescription':
+          await adminSupabase
+            .from('prescriptions')
+            .update({
+              status: 'dispensed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', item.id);
+          break;
+      }
+    }
+
+    revalidatePath('/dashboard/billing');
+    revalidatePath('/dashboard/lab/orders');
+    revalidatePath('/dashboard/appointments');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error al marcar items como facturados:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al actualizar items' 
+    };
+  }
+}
+
+// ============================================
+// LEDGER CONSOLIDADO DEL PACIENTE
+// ============================================
+
+export interface PatientLedgerEntry {
+  id: string;
+  date: string;
+  type: 'invoice' | 'payment' | 'credit' | 'refund' | 'lab_order' | 'appointment' | 'inventory';
+  description: string;
+  reference: string;
+  debit: number; // Amount owed/increased
+  credit: number; // Amount paid/decreased
+  balance: number;
+  details?: Record<string, unknown>;
+}
+
+export interface PatientLedgerSummary {
+  patientId: string;
+  patientName: string;
+  totalInvoiced: number;
+  totalPaid: number;
+  totalCredits: number;
+  pendingBalance: number;
+  entries: PatientLedgerEntry[];
+}
+
+export async function getPatientLedger(
+  patientId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<{ success: boolean; ledger?: PatientLedgerSummary; error?: string }> {
+  const adminSupabase = createAdminClient();
+
+  try {
+    // Obtener datos del paciente
+    const { data: patient, error: patientError } = await adminSupabase
+      .from('patients')
+      .select('id, first_name, last_name, phone, insurance_provider, insurance_policy_number')
+      .eq('id', patientId)
+      .single();
+
+    if (patientError || !patient) {
+      return { success: false, error: 'Paciente no encontrado' };
+    }
+
+    const entries: PatientLedgerEntry[] = [];
+    let runningBalance = 0;
+
+    // 1. Obtener facturas
+    let invoiceQuery = adminSupabase
+      .from('invoices')
+      .select('id, invoice_number, total_amount, amount_paid, status, created_at, due_date, items')
+      .eq('patient_id', patientId);
+
+    if (startDate) invoiceQuery = invoiceQuery.gte('created_at', startDate);
+    if (endDate) invoiceQuery = invoiceQuery.lte('created_at', endDate);
+
+    const { data: invoices } = await invoiceQuery.order('created_at', { ascending: true });
+
+    if (invoices) {
+      for (const inv of invoices) {
+        const items = inv.items as InvoiceItemData[] || [];
+        const description = items.length > 0 
+          ? `Factura #${inv.invoice_number} (${items.length} item(s))`
+          : `Factura #${inv.invoice_number}`;
+        
+        entries.push({
+          id: inv.id,
+          date: inv.created_at,
+          type: 'invoice',
+          description,
+          reference: inv.invoice_number,
+          debit: Number(inv.total_amount),
+          credit: Number(inv.amount_paid),
+          balance: 0, // Se calcula después
+          details: { status: inv.status, due_date: inv.due_date }
+        });
+      }
+    }
+
+    // 2. Obtener pagos (simulados desde invoices)
+    // Los pagos están registrados en amount_paid de las facturas
+    for (const entry of entries.filter(e => e.type === 'invoice')) {
+      if (entry.credit > 0) {
+        entries.push({
+          id: `${entry.id}-payment`,
+          date: entry.date,
+          type: 'payment',
+          description: `Pago a factura ${entry.reference}`,
+          reference: `PAY-${entry.reference}`,
+          debit: 0,
+          credit: entry.credit,
+          balance: 0,
+          details: { invoice_id: entry.id }
+        });
+      }
+    }
+
+    // 3. Obtener órdenes de laboratorio
+    const { data: labOrders } = await adminSupabase
+      .from('lab_orders')
+      .select('id, order_number, total_amount, payment_status, created_at')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: true });
+
+    if (labOrders) {
+      for (const order of labOrders) {
+        entries.push({
+          id: order.id,
+          date: order.created_at,
+          type: 'lab_order',
+          description: `Orden de Laboratorio #${order.order_number}`,
+          reference: order.order_number,
+          debit: Number(order.total_amount) || 0,
+          credit: order.payment_status === 'paid' || order.payment_status === 'invoiced' ? Number(order.total_amount) || 0 : 0,
+          balance: 0,
+          details: { payment_status: order.payment_status }
+        });
+      }
+    }
+
+    // 4. Obtener transacciones de inventario (ventas)
+    const { data: inventoryTx } = await adminSupabase
+      .from('inventory_transactions')
+      .select('id, inventory_id, quantity, created_at, transaction_type, reference_id')
+      .eq('transaction_type', 'sale')
+      .order('created_at', { ascending: true });
+
+    if (inventoryTx) {
+      for (const tx of inventoryTx) {
+        // Esta es una simplificación - en producción habría que cruzar con patient_id
+        // Por ahora solo contamos transacciones de pacientes específicos
+      }
+    }
+
+    // Ordenar por fecha
+    entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calcular balance running
+    let currentBalance = 0;
+    for (const entry of entries) {
+      currentBalance += entry.debit - entry.credit;
+      entry.balance = currentBalance;
+    }
+
+    const totalInvoiced = entries.reduce((sum, e) => sum + e.debit, 0);
+    const totalPaid = entries.reduce((sum, e) => sum + e.credit, 0);
+
+    return {
+      success: true,
+      ledger: {
+        patientId: patient.id,
+        patientName: `${patient.first_name} ${patient.last_name}`,
+        totalInvoiced,
+        totalPaid,
+        totalCredits: 0,
+        pendingBalance: currentBalance,
+        entries
+      }
+    };
+  } catch (error) {
+    console.error('Error al obtener ledger del paciente:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al obtener ledger' 
+    };
+  }
+}
+
+// ============================================
+// GENERAR RECLAMACIÓN DE SEGURO
+// ============================================
+
+export interface InsuranceClaimItem {
+  cptCode: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  icdCodes: string[];
+}
+
+export interface InsuranceClaim {
+  patientId: string;
+  patientName: string;
+  insuranceProvider: string;
+  policyNumber: string;
+  claimNumber: string;
+  serviceDate: string;
+  totalAmount: number;
+  items: InsuranceClaimItem[];
+  generatedAt: string;
+}
+
+export async function generateInsuranceClaim(
+  invoiceId: string
+): Promise<{ success: boolean; claim?: InsuranceClaim; error?: string }> {
+  const adminSupabase = createAdminClient();
+
+  try {
+    // Obtener factura con datos del paciente
+    const { data: invoice, error: invoiceError } = await adminSupabase
+      .from('invoices')
+      .select(`
+        id,
+        invoice_number,
+        total_amount,
+        items,
+        created_at,
+        issued_date,
+        patients!inner(id, first_name, last_name, insurance_provider, insurance_policy_number)
+      `)
+      .eq('id', invoiceId)
+      .single();
+
+    if (invoiceError || !invoice) {
+      return { success: false, error: 'Factura no encontrada' };
+    }
+
+    const patient = invoice.patients?.[0] as Record<string, unknown> | undefined;
+    
+    if (!patient?.insurance_provider) {
+      return { success: false, error: 'El paciente no tiene seguro asociado' };
+    }
+
+    // Generar número de reclamación
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const random = Math.floor(Math.random() * 100000).toString().padStart(6, '0');
+    const claimNumber = `CLM-${today}-${random}`;
+
+    // Convertir items de factura a formato de reclamación
+    const items: InsuranceClaimItem[] = [];
+    const invoiceItems = invoice.items as InvoiceItemData[] || [];
+    
+    for (const item of invoiceItems) {
+      items.push({
+        cptCode: item.service_code || 'N/A',
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        total: item.total,
+        icdCodes: [] // ICD codes vendrían de medical_records si existen
+      });
+    }
+
+    const claim: InsuranceClaim = {
+      patientId: patient.id as string,
+      patientName: `${patient.first_name} ${patient.last_name}`,
+      insuranceProvider: patient.insurance_provider as string,
+      policyNumber: patient.insurance_policy_number as string,
+      claimNumber,
+      serviceDate: invoice.issued_date,
+      totalAmount: Number(invoice.total_amount),
+      items,
+      generatedAt: new Date().toISOString()
+    };
+
+    return {
+      success: true,
+      claim
+    };
+  } catch (error) {
+    console.error('Error al generar reclamación de seguro:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al generar reclamación' 
+    };
+  }
+}
+
+// ============================================
+// CRÉDITOS Y ANTICIPOS DE PACIENTES
+// ============================================
+
+export interface PatientCredit {
+  id: string;
+  patient_id: string;
+  amount: number;
+  balance: number;
+  credit_type: 'deposit' | 'refund' | 'adjustment';
+  description: string;
+  reference?: string;
+  expires_at?: string;
+  is_active: boolean;
+  created_at: string;
+  created_by: string;
+}
+
+export async function createPatientCredit(
+  patientId: string,
+  amount: number,
+  creditType: 'deposit' | 'refund' | 'adjustment',
+  description: string,
+  reference?: string,
+  expiresAt?: string
+): Promise<{ success: boolean; credit?: PatientCredit; error?: string }> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    const { data, error } = await adminSupabase
+      .from('patient_credits')
+      .insert({
+        patient_id: patientId,
+        amount,
+        balance: amount,
+        credit_type: creditType,
+        description,
+        reference,
+        expires_at: expiresAt || null,
+        is_active: true,
+        created_by: user.id
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error al crear crédito:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/billing');
+    
+    return {
+      success: true,
+      credit: data as PatientCredit
+    };
+  } catch (error) {
+    console.error('Error al crear crédito de paciente:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al crear crédito' 
+    };
+  }
+}
+
+export async function getPatientCredits(
+  patientId: string
+): Promise<{ success: boolean; credits?: PatientCredit[]; totalBalance?: number; error?: string }> {
+  const adminSupabase = createAdminClient();
+
+  try {
+    const { data, error } = await adminSupabase
+      .from('patient_credits')
+      .select('*')
+      .eq('patient_id', patientId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error al obtener créditos:', error);
+      return { success: false, error: error.message };
+    }
+
+    const credits = (data || []) as PatientCredit[];
+    const totalBalance = credits.reduce((sum, c) => sum + c.balance, 0);
+
+    return {
+      success: true,
+      credits,
+      totalBalance
+    };
+  } catch (error) {
+    console.error('Error al obtener créditos del paciente:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al obtener créditos' 
+    };
+  }
+}
+
+export async function applyCreditToInvoice(
+  creditId: string,
+  invoiceId: string,
+  amount: number
+): Promise<{ success: boolean; error?: string }> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Obtener crédito
+    const { data: credit, error: creditError } = await adminSupabase
+      .from('patient_credits')
+      .select('*')
+      .eq('id', creditId)
+      .eq('is_active', true)
+      .single();
+
+    if (creditError || !credit) {
+      return { success: false, error: 'Crédito no encontrado' };
+    }
+
+    if (credit.balance < amount) {
+      return { success: false, error: 'El crédito no tiene saldo suficiente' };
+    }
+
+    // Actualizar saldo del crédito
+    const { error: updateCreditError } = await adminSupabase
+      .from('patient_credits')
+      .update({
+        balance: credit.balance - amount,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', creditId);
+
+    if (updateCreditError) {
+      return { success: false, error: updateCreditError.message };
+    }
+
+    // Desactivar crédito si saldo es 0
+    if (credit.balance - amount <= 0) {
+      await adminSupabase
+        .from('patient_credits')
+        .update({ is_active: false })
+        .eq('id', creditId);
+    }
+
+    revalidatePath('/dashboard/billing');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error al aplicar crédito:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al aplicar crédito' 
+    };
+  }
+}
+
+// ============================================
+// PAGOS DIVIDIDOS
+// ============================================
+
+export interface SplitPayment {
+  invoiceId: string;
+  payments: Array<{
+    method: 'CASH' | 'CARD' | 'TRANSFER' | 'CREDIT' | 'INSURANCE';
+    amount: number;
+    reference?: string;
+    creditId?: string;
+  }>;
+}
+
+export async function processSplitPayment(
+  paymentData: SplitPayment
+): Promise<{ success: boolean; invoiceId?: string; error?: string }> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Obtener factura
+    const { data: invoice, error: invoiceError } = await adminSupabase
+      .from('invoices')
+      .select('*')
+      .eq('id', paymentData.invoiceId)
+      .single();
+
+    if (invoiceError || !invoice) {
+      return { success: false, error: 'Factura no encontrada' };
+    }
+
+    // Calcular total de pagos
+    const totalPayment = paymentData.payments.reduce((sum, p) => sum + p.amount, 0);
+    const pendingAmount = Number(invoice.total_amount) - Number(invoice.amount_paid || 0);
+
+    if (totalPayment !== pendingAmount) {
+      return { 
+        success: false, 
+        error: `El total de pagos (${totalPayment}) no coincide con el pendiente (${pendingAmount})` 
+      };
+    }
+
+    // Generar referencia de pago combinada
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const paymentReference = `PAY-${today}-${random}`;
+
+    // Procesar cada método de pago
+    for (const payment of paymentData.payments) {
+      // Si es crédito, aplicarlo
+      if (payment.method === 'CREDIT' && payment.creditId) {
+        await applyCreditToInvoice(payment.creditId, paymentData.invoiceId, payment.amount);
+      }
+    }
+
+    // Actualizar factura
+    const newAmountPaid = Number(invoice.amount_paid || 0) + totalPayment;
+    const newStatus = newAmountPaid >= Number(invoice.total_amount) ? 'paid' : 'pending';
+
+    const { error: updateError } = await adminSupabase
+      .from('invoices')
+      .update({
+        status: newStatus,
+        amount_paid: newAmountPaid,
+        payment_method: 'SPLIT',
+        payment_reference: paymentReference,
+        paid_date: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', paymentData.invoiceId);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    revalidatePath('/dashboard/billing');
+    revalidatePath(`/dashboard/billing/${paymentData.invoiceId}`);
+
+    return {
+      success: true,
+      invoiceId: paymentData.invoiceId
+    };
+  } catch (error) {
+    console.error('Error al procesar pago dividido:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al procesar pago' 
     };
   }
 }
