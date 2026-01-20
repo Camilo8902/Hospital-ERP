@@ -43,8 +43,7 @@ export interface InventoryDocument {
 export interface InventoryMovement {
   id: string;
   inventory_id: string;
-  type: string;
-  transaction_type: 'in' | 'out' | 'adjustment' | 'transfer' | 'return' | 'disposal' | 'prescription_dispense' | 'sale';
+  transaction_type: 'in' | 'out' | 'adjustment' | 'transfer' | 'return' | 'disposal' | 'prescription_dispense' | 'sale' | 'prescription_dispense';
   quantity: number;
   previous_quantity: number;
   new_quantity: number;
@@ -1469,6 +1468,23 @@ export async function getPOSTransactions(
     return [];
   }
 
+  // Obtener IDs de operadores únicos para buscar sus nombres
+  const operatorIds = Array.from(new Set((data || []).map(tx => tx.performed_by).filter(Boolean)));
+  const operatorMap: Record<string, string> = {};
+
+  if (operatorIds.length > 0) {
+    const { data: profiles } = await adminSupabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', operatorIds);
+    
+    if (profiles) {
+      profiles.forEach(profile => {
+        operatorMap[profile.id] = profile.full_name || 'Desconocido';
+      });
+    }
+  }
+
   // Convertir registros inventory_transactions a formato POSTransaction
   const transactions: POSTransaction[] = (data || []).map(tx => {
     let saleDetails = {
@@ -1502,7 +1518,8 @@ export async function getPOSTransactions(
       items_count: saleDetails.items_count,
       customer_name: saleDetails.customer_name,
       notes: tx.notes || null,
-      operator_id: tx.performed_by || null,
+      operator_id: tx.performed_by || '',
+      operator_name: tx.performed_by ? (operatorMap[tx.performed_by] || 'Desconocido') : 'Desconocido',
       created_at: tx.created_at,
       updated_at: tx.created_at,
       items: [],
