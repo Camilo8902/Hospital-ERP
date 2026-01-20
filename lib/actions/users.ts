@@ -8,6 +8,7 @@ import {
   adminDeleteUser,
   adminUpdateUserPassword 
 } from '@/lib/supabase/admin';
+import { getCurrentProfile } from '@/lib/supabase/server';
 
 export type UserRole = 'admin' | 'doctor' | 'nurse' | 'reception' | 'pharmacy';
 
@@ -25,19 +26,7 @@ export interface UserProfile {
 
 // Obtener usuario actual autenticado
 export async function getCurrentUser(): Promise<UserProfile | null> {
-  const adminSupabase = createAdminClient();
-  
-  const { data, error } = await adminSupabase
-    .from('profiles')
-    .select('*')
-    .eq('id', (await adminSupabase.auth.getSession()).data.session?.user.id || '')
-    .single();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return data as UserProfile;
+  return await getCurrentProfile();
 }
 
 // Obtener todos los usuarios (USANDO ADMIN CLIENT para evitar problemas RLS)
