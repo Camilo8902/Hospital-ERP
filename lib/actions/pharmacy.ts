@@ -1490,7 +1490,7 @@ export async function getPOSTransactions(
     let saleDetails = {
       transaction_number: tx.reference_id,
       payment_method: 'CASH' as const,
-      customer_name: null,
+      customer_name: undefined as string | undefined,
       items_count: 0,
       subtotal: 0,
       discount_total: 0,
@@ -1516,13 +1516,12 @@ export async function getPOSTransactions(
       tax_amount: saleDetails.tax_amount,
       total_amount: saleDetails.total_amount,
       items_count: saleDetails.items_count,
-      customer_name: saleDetails.customer_name,
-      notes: tx.notes || null,
+      customer_name: saleDetails.customer_name || undefined,
+      notes: tx.notes || undefined,
       operator_id: tx.performed_by || '',
       operator_name: tx.performed_by ? (operatorMap[tx.performed_by] || 'Desconocido') : 'Desconocido',
       created_at: tx.created_at,
       updated_at: tx.created_at,
-      items: [],
     };
   });
 
