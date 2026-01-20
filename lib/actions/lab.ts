@@ -839,6 +839,58 @@ export async function getRecentLabOrders(limit: number = 10): Promise<LabOrder[]
 }
 
 // ============================================
+// ÓRDENES PENDIENTES DEL DÍA PARA DASHBOARD
+// ============================================
+
+export async function getTodayPendingLabOrders(): Promise<LabOrder[]> {
+  const adminSupabase = createAdminClient();
+  
+  const today = new Date().toISOString().split('T')[0];
+  const todayStart = `${today}T00:00:00`;
+  const todayEnd = `${today}T23:59:59`;
+  
+  // Obtener órdenes pendientes y en proceso de hoy
+  const { data: orders, error } = await adminSupabase
+    .from('lab_orders')
+    .select(`
+      *,
+      patients(id, first_name, last_name, phone, medical_record_number),
+      profiles(full_name, role)
+    `)
+    .in('status', ['pending', 'in_progress'])
+    .gte('created_at', todayStart)
+    .lte('created_at', todayEnd)
+    .order('priority', { ascending: false }) // Urgentes primero
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error al obtener órdenes pendientes del día:', error);
+    return [];
+  }
+
+  // Obtener detalles para cada orden
+  const ordersWithDetails = await Promise.all(
+    (orders || []).map(async (order) => {
+      const { data: details } = await adminSupabase
+        .from('lab_order_details')
+        .select(`
+          id,
+          test_id,
+          tests:lab_test_catalog(id, code, name, category:lab_categories(name))
+        `)
+        .eq('order_id', order.id);
+
+      return {
+        ...order,
+        lab_order_details: details || [],
+      };
+    })
+  );
+
+  return ordersWithDetails;
+}
+
+// ============================================
 // ÓRDENES POR PACIENTE
 // ============================================
 

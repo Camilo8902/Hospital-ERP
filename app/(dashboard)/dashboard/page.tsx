@@ -5,10 +5,14 @@ import {
   Pill,
   AlertCircle,
   Activity,
+  FlaskConical,
+  Clock,
+  ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getDashboardStats, getTodayAppointments, getRecentPatients } from '@/lib/actions/dashboard';
+import { getTodayPendingLabOrders } from '@/lib/actions/lab';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -23,6 +27,7 @@ export default async function DashboardPage() {
   const stats = await getDashboardStats();
   const todayAppointmentsList = await getTodayAppointments();
   const recentPatients = await getRecentPatients();
+  const pendingLabOrders = await getTodayPendingLabOrders();
 
   const role = profile?.role || 'reception';
 
@@ -161,6 +166,97 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* Pending Lab Orders */}
+        <div className="card">
+          <div className="card-header flex items-center justify-between py-3 sm:py-4">
+            <div className="flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 text-purple-600" />
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Exámenes Pendientes</h2>
+            </div>
+            <Link href="/dashboard/lab/orders" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+              Ver todas
+            </Link>
+          </div>
+          <div className="card-body py-2 sm:py-4">
+            {pendingLabOrders && pendingLabOrders.length > 0 ? (
+              <div className="space-y-2 sm:space-y-3">
+                {pendingLabOrders.slice(0, 5).map((order) => {
+                  const labOrder = order as {
+                    id: string;
+                    order_number: string;
+                    status: string;
+                    priority: string;
+                    created_at: string;
+                    patients?: {
+                      first_name?: string;
+                      last_name?: string;
+                      medical_record_number?: string;
+                    };
+                    lab_order_details?: Array<{
+                      id: string;
+                      tests?: {
+                        code?: string;
+                        name?: string;
+                      };
+                    }>;
+                  };
+                  
+                  const patientName = labOrder.patients 
+                    ? `${labOrder.patients.first_name || ''} ${labOrder.patients.last_name || ''}`
+                    : 'Paciente desconocido';
+                  
+                  const testCodes = labOrder.lab_order_details
+                    ?.map(d => d.tests?.code)
+                    .filter(Boolean)
+                    .join(', ') || 'Sin pruebas';
+
+                  return (
+                    <Link
+                      key={labOrder.id}
+                      href={`/dashboard/lab/orders/${labOrder.id}`}
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-purple-50 transition-colors touch-manipulation"
+                    >
+                      <div className={'w-10 h-10 sm:w-12 rounded-full flex items-center justify-center flex-shrink-0 ' + (labOrder.priority === 'urgent' ? 'bg-red-100' : 'bg-purple-100')}>
+                        <FlaskConical className={'w-5 h-5 ' + (labOrder.priority === 'urgent' ? 'text-red-600' : 'text-purple-600')} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                          {patientName}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 truncate">
+                          {testCodes}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        {labOrder.priority === 'urgent' && (
+                          <span className="badge badge-danger text-xs">Urgente</span>
+                        )}
+                        <span className={'badge text-xs ' + (labOrder.status === 'in_progress' ? 'badge-warning' : 'badge-info')}>
+                          {labOrder.status === 'in_progress' ? 'En proceso' : 'Pendiente'}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    </Link>
+                  );
+                })}
+                {pendingLabOrders.length > 5 && (
+                  <Link 
+                    href="/dashboard/lab/orders?status=pending"
+                    className="block text-center py-2 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    Ver {pendingLabOrders.length - 5} más...
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6 sm:py-8 text-gray-500">
+                <FlaskConical className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">No hay exámenes pendientes para hoy</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Recent patients */}
         <div className="card">
           <div className="card-header flex items-center justify-between py-3 sm:py-4">
@@ -202,6 +298,49 @@ export default async function DashboardPage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Recent patients - Separate card below grid */}
+      <div className="card">
+        <div className="card-header flex items-center justify-between py-3 sm:py-4">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Pacientes Recientes</h2>
+          <Link href="/dashboard/patients" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+            Ver todos
+          </Link>
+        </div>
+        <div className="card-body py-2 sm:py-4">
+          {recentPatients && recentPatients.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {recentPatients.slice(0, 6).map((patient) => (
+                <Link
+                  key={patient.id}
+                  href={`/dashboard/patients/${patient.id}`}
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors touch-manipulation"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-medium text-sm flex-shrink-0">
+                    {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">
+                      {patient.first_name} {patient.last_name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      MRN: {patient.medical_record_number}
+                    </p>
+                  </div>
+                  <span className="text-xs text-gray-400 flex-shrink-0">
+                    {new Date(patient.created_at).toLocaleDateString('es-MX')}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 sm:py-8 text-gray-500">
+              <Users className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">No hay pacientes registrados</p>
+            </div>
+          )}
         </div>
       </div>
 
