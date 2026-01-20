@@ -533,3 +533,169 @@ export interface TransactionPayload {
   customerName?: string;
   notes?: string;
 }
+
+// ============================================
+// TIPOS PARA SISTEMA DE PAGOS EUROPEOS (FASE 1)
+// ============================================
+
+export type PaymentStatus = 
+  | 'PENDING'        // Pago iniciado, esperando confirmación
+  | 'PROCESSING'     // Procesando con el proveedor
+  | 'SUCCEEDED'      // Pago completado exitosamente
+  | 'FAILED'         // Pago falló
+  | 'REFUNDED'       // Reembolso completo
+  | 'PARTIALLY_REFUNDED' // Reembolso parcial
+  | 'CANCELLED';     // Pago cancelado antes de completar
+
+export type PaymentMethodType = 
+  | 'CARD'           // Tarjetas de crédito/débito (Visa, Mastercard, etc.)
+  | 'BIZUM'          // Bizum (España)
+  | 'SEPA_DEBIT'     // Débito directo SEPA
+  | 'PAYPAL';        // PayPal (futuro)
+
+export type PaymentReferenceType = 
+  | 'LAB_ORDER'      // Orden de laboratorio
+  | 'CONSULTATION'   // Consulta médica
+  | 'INVOICE'        // Factura general
+  | 'POS_SALE';      // Venta POS de farmacia
+
+// Transacción de pago
+export interface PaymentTransaction {
+  id: string;
+  amount: number;              // En céntimos
+  currency: string;            // EUR por defecto
+  status: PaymentStatus;
+  payment_method: PaymentMethodType;
+  provider: string;            // 'STRIPE'
+  provider_transaction_id?: string;
+  provider_payment_intent_id?: string;
+  provider_customer_id?: string;
+  description?: string;
+  customer_email?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  reference_type?: PaymentReferenceType;
+  reference_id?: string;
+  metadata?: Record<string, unknown>;
+  refunded_amount: number;     // En céntimos
+  refund_reason?: string;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}
+
+// Reembolso
+export interface PaymentRefund {
+  id: string;
+  transaction_id: string;
+  amount: number;              // En céntimos
+  currency: string;
+  status: PaymentStatus;
+  provider_refund_id?: string;
+  reason: string;
+  notes?: string;
+  processed_by?: string;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}
+
+// Método de pago guardado
+export interface PaymentMethod {
+  id: string;
+  user_id: string;
+  type: PaymentMethodType;
+  provider_method_id: string;
+  last4?: string;              // Últimos 4 dígitos
+  brand?: string;              // Visa, Mastercard, etc.
+  bank_name?: string;          // Para SEPA
+  iban_prefix?: string;        // Para SEPA
+  is_default: boolean;
+  is_active: boolean;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// Evento de webhook
+export interface PaymentWebhookEvent {
+  id: string;
+  stripe_event_id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  processed: boolean;
+  processed_at?: string;
+  error_message?: string;
+  received_at: string;
+}
+
+// DTOs para la API
+
+export interface CreatePaymentIntentDTO {
+  amount: number;              // En céntimos
+  currency?: string;           // Por defecto 'EUR'
+  paymentMethod: PaymentMethodType;
+  referenceType: PaymentReferenceType;
+  referenceId: string;
+  customerEmail?: string;
+  customerName?: string;
+  customerPhone?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreatePaymentIntentResponse {
+  success: boolean;
+  clientSecret?: string;       // Para completar el pago en el cliente
+  transactionId?: string;
+  providerPaymentIntentId?: string;
+  error?: string;
+}
+
+export interface PaymentStatusResponse {
+  success: boolean;
+  transaction?: PaymentTransaction;
+  error?: string;
+}
+
+export interface ProcessRefundDTO {
+  amount?: number;             // Opcional, si no se indica es reembolso total
+  reason: string;
+  notes?: string;
+}
+
+export interface ProcessRefundResponse {
+  success: boolean;
+  refund?: PaymentRefund;
+  error?: string;
+}
+
+export interface PaymentStats {
+  totalTransactions: number;
+  successfulTransactions: number;
+  failedTransactions: number;
+  totalAmount: number;
+  totalRefunded: number;
+  averageTicket: number;
+  byPaymentMethod: Record<PaymentMethodType, {
+    count: number;
+    amount: number;
+  }>;
+}
+
+// Tipos para el cliente (Stripe Elements)
+export interface StripePaymentMethodData {
+  type: PaymentMethodType;
+  card?: {
+    element: unknown;
+  };
+  sepa_debit?: {
+    element: unknown;
+  };
+}
+
+export interface PaymentConfirmationResult {
+  status: 'succeeded' | 'processing' | 'requires_payment_method' | 'requires_confirmation' | 'requires_action';
+  clientSecret: string;
+  error?: string;
+}
