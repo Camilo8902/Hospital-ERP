@@ -229,6 +229,25 @@ export async function getAllPatientsForSelect(): Promise<{ id: string; full_name
   }));
 }
 
+// Buscar pacientes por término de búsqueda
+export async function searchPatients(searchTerm: string): Promise<Patient[]> {
+  const adminSupabase = createAdminClient();
+  
+  const { data, error } = await adminSupabase
+    .from('patients')
+    .select('*')
+    .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,medical_record_number.ilike.%${searchTerm}%`)
+    .order('last_name', { ascending: true })
+    .limit(20);
+
+  if (error) {
+    console.error('Error al buscar pacientes:', error);
+    return [];
+  }
+
+  return data as Patient[];
+}
+
 // ============================================
 // ANOTACIONES DE PACIENTES
 // ============================================
