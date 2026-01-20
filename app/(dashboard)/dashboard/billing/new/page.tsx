@@ -1,34 +1,42 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
-import { createInvoice } from '@/lib/actions/payments';
-import { ArrowLeft, Plus, Trash2, Save, FileText, Calendar, User, DollarSign, Calculator, AlertCircle, CheckCircle } from 'lucide-react';
-
-interface Patient {
-  id: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  insurance_provider?: string;
-}
+import { createInvoice, getUnbilledItems } from '@/lib/actions/payments';
+import { searchPatients, getPatients } from '@/lib/actions/patients';
+import { ArrowLeft, Plus, Trash2, Save, FileText, Calendar, User, DollarSign, Calculator, AlertCircle, CheckCircle, Search, FlaskConical, ShoppingCart, Loader2 } from 'lucide-react';
+import type { Patient } from '@/lib/types';
 
 interface InvoiceItem {
   description: string;
   quantity: number;
   unit_price: number;
+  source_type?: string;
+  source_id?: string;
+}
+
+interface UnbilledItem {
+  id: string;
+  type: 'lab_order' | 'appointment' | 'pos_sale' | 'manual';
+  description: string;
+  date: string;
+  amount: number;
+  details?: string;
 }
 
 export default function NewInvoicePage() {
   const router = useRouter();
-  const supabase = createClient();
   
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [allPatients, setAllPatients] = useState<Patient[]>([]);
+  const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientSearch, setPatientSearch] = useState('');
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
+  const [isSearchingPatients, setIsSearchingPatients] = useState(false);
+  
+  const [unbilledItems, setUnbilledItems] = useState<UnbilledItem[]>([]);
+  const [isLoadingUnbilled, setIsLoadingUnbilled] = useState(false);
   
   const [items, setItems] = useState<InvoiceItem[]>([
     { description: '', quantity: 1, unit_price: 0 }
@@ -38,43 +46,97 @@ export default function NewInvoicePage() {
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Set default due date to 30 days from now
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
   useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowPatientDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Load initial data
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      try {
+        // Load all patients for the dropdown
+        const patients = await getPatients();
+        setAllPatients(patients);
+      } catch (err) {
+        console.error('Error loading patients:', err);
+        setError('Error al cargar pacientes');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadInitialData();
+
+    // Set default due date to 30 days from now
     const today = new Date();
     const dueDate = new Date(today);
     dueDate.setDate(dueDate.getDate() + 30);
     setDueDate(dueDate.toISOString().split('T')[0]);
   }, []);
 
-  // Fetch patients for search
+  // Fetch patients for search using server action
   useEffect(() => {
     const fetchPatients = async () => {
       if (patientSearch.length < 2) {
-        setPatients([]);
+        setSearchResults([]);
+        setShowPatientDropdown(false);
         return;
       }
 
-      const { data } = await supabase
-        .from('patients')
-        .select('id, first_name, last_name, phone, insurance_provider')
-        .ilike('first_name', `%${patientSearch}%`)
-        .or(`last_name.ilike.%${patientSearch}%,phone.ilike.%${patientSearch}%`)
-        .limit(10);
-
-      if (data) {
-        setPatients(data);
+      setIsSearchingPatients(true);
+      try {
+        const results = await searchPatients(patientSearch);
+        setSearchResults(results);
         setShowPatientDropdown(true);
+      } catch (err) {
+        console.error('Error searching patients:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearchingPatients(false);
       }
     };
 
     const timer = setTimeout(fetchPatients, 300);
     return () => clearTimeout(timer);
-  }, [patientSearch, supabase]);
+  }, [patientSearch]);
+
+  // Load unbilled items when patient is selected
+  useEffect(() => {
+    const loadUnbilledItems = async () => {
+      if (!selectedPatient) {
+        setUnbilledItems([]);
+        return;
+      }
+
+      setIsLoadingUnbilled(true);
+      try {
+        const result = await getUnbilledItems(selectedPatient.id);
+        if (result.success && result.items) {
+          setUnbilledItems(result.items);
+        }
+      } catch (err) {
+        console.error('Error loading unbilled items:', err);
+      } finally {
+        setIsLoadingUnbilled(false);
+      }
+    };
+
+    loadUnbilledItems();
+  }, [selectedPatient]);
 
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
@@ -105,6 +167,24 @@ export default function NewInvoicePage() {
     setSelectedPatient(patient);
     setPatientSearch(`${patient.first_name} ${patient.last_name}`);
     setShowPatientDropdown(false);
+  };
+
+  // Add item from unbilled sources
+  const addUnbilledItem = (item: UnbilledItem) => {
+    setItems([...items, {
+      description: item.description,
+      quantity: 1,
+      unit_price: item.amount,
+      source_type: item.type,
+      source_id: item.id
+    }]);
+    // Remove from unbilled items
+    setUnbilledItems(unbilledItems.filter(i => i.id !== item.id));
+  };
+
+  // Add manual item
+  const addManualItem = () => {
+    setItems([...items, { description: '', quantity: 1, unit_price: 0 }]);
   };
 
   // Handle submit
@@ -229,38 +309,55 @@ export default function NewInvoicePage() {
               Datos del Paciente
             </h2>
 
-            <div className="relative">
+            <div ref={searchContainerRef} className="relative">
               <label className="label mb-2">Buscar Paciente</label>
-              <input
-                type="text"
-                value={patientSearch}
-                onChange={(e) => {
-                  setPatientSearch(e.target.value);
-                  setSelectedPatient(null);
-                  setShowPatientDropdown(true);
-                }}
-                onFocus={() => setShowPatientDropdown(true)}
-                placeholder="Nombre, apellido o teléfono..."
-                className="input"
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={patientSearch}
+                  onChange={(e) => {
+                    setPatientSearch(e.target.value);
+                    setSelectedPatient(null);
+                    setShowPatientDropdown(true);
+                  }}
+                  onFocus={() => {
+                    if (patientSearch.length >= 2) {
+                      setShowPatientDropdown(true);
+                    }
+                  }}
+                  placeholder="Nombre, apellido o teléfono..."
+                  className="input pl-10 w-full"
+                />
+                {isSearchingPatients && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-500 animate-spin" />
+                )}
+              </div>
 
-              {showPatientDropdown && patients.length > 0 && (
+              {showPatientDropdown && patientSearch.length >= 2 && (
                 <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-                  {patients.map((patient) => (
-                    <button
-                      key={patient.id}
-                      onClick={() => selectPatient(patient)}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0"
-                    >
-                      <p className="font-medium text-gray-900">
-                        {patient.first_name} {patient.last_name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {patient.phone}
-                        {patient.insurance_provider && ` • ${patient.insurance_provider}`}
-                      </p>
-                    </button>
-                  ))}
+                  {searchResults.length > 0 ? (
+                    searchResults.map((patient) => (
+                      <button
+                        key={patient.id}
+                        type="button"
+                        onClick={() => selectPatient(patient)}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0"
+                      >
+                        <p className="font-medium text-gray-900">
+                          {patient.first_name} {patient.last_name}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {patient.phone}
+                          {patient.insurance_provider && ` • ${patient.insurance_provider}`}
+                        </p>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-center text-gray-500">
+                      <p className="text-sm">No se encontraron pacientes</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -279,6 +376,68 @@ export default function NewInvoicePage() {
             )}
           </div>
         </div>
+
+        {/* Unbilled Items Section - INTEGRACIÓN CON OTROS MÓDULOS */}
+        {selectedPatient && unbilledItems.length > 0 && (
+          <div className="card border-blue-200 bg-blue-50">
+            <div className="card-body">
+              <div className="flex items-center gap-2 mb-4">
+                <ShoppingCart className="w-5 h-5 text-blue-600" />
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Items Pendientes de Facturar
+                </h2>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Los siguientes servicios están pendientes de facturar para este paciente:
+              </p>
+
+              {isLoadingUnbilled ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                  <span className="ml-2 text-gray-500">Cargando items...</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {unbilledItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        {item.type === 'lab_order' && (
+                          <FlaskConical className="w-5 h-5 text-purple-500" />
+                        )}
+                        {item.type === 'pos_sale' && (
+                          <ShoppingCart className="w-5 h-5 text-green-500" />
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-900">{item.description}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(item.date).toLocaleDateString()}
+                            {item.details && ` • ${item.details}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-gray-900">
+                          {formatCurrency(item.amount)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => addUnbilledItem(item)}
+                          className="btn-primary btn-sm flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Agregar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Invoice Items */}
         <div className="card">

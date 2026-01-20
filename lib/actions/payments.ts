@@ -628,6 +628,8 @@ export interface CreateInvoiceDTO {
     service_code?: string;
     quantity: number;
     unit_price: number;
+    source_type?: string;
+    source_id?: string;
   }>;
   taxRate?: number;
   discountAmount?: number;
@@ -671,6 +673,8 @@ export async function createInvoice(invoiceData: CreateInvoiceDTO): Promise<Crea
       quantity: item.quantity,
       unit_price: item.unit_price,
       total: item.quantity * item.unit_price,
+      source_type: item.source_type || null,
+      source_id: item.source_id || null,
     }));
 
     // Insertar factura
@@ -744,6 +748,113 @@ export async function cancelInvoice(
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Error al cancelar la factura' 
+    };
+  }
+}
+
+// ============================================
+// OBTENER ITEMS NO FACTURADOS (PARA INTEGRACIÓN)
+// ============================================
+
+export interface UnbilledItem {
+  id: string;
+  type: 'lab_order' | 'appointment' | 'pos_sale' | 'manual';
+  description: string;
+  date: string;
+  amount: number;
+  details?: string;
+}
+
+export async function getUnbilledItems(
+  patientId: string
+): Promise<{ success: boolean; items?: UnbilledItem[]; error?: string }> {
+  const adminSupabase = createAdminClient();
+
+  try {
+    const unbilledItems: UnbilledItem[] = [];
+
+    // 1. Buscar órdenes de laboratorio no pagadas
+    const { data: labOrders, error: labError } = await adminSupabase
+      .from('lab_orders')
+      .select('id, order_number, total_amount, created_at, payment_status')
+      .eq('patient_id', patientId)
+      .neq('payment_status', 'paid')
+      .order('created_at', { ascending: false });
+
+    if (labError) {
+      console.error('Error al obtener órdenes de laboratorio:', labError);
+    } else if (labOrders) {
+      labOrders.forEach(order => {
+        unbilledItems.push({
+          id: order.id,
+          type: 'lab_order',
+          description: `Orden de Laboratorio #${order.order_number}`,
+          date: order.created_at,
+          amount: Number(order.total_amount) || 0,
+          details: `Estado de pago: ${order.payment_status}`
+        });
+      });
+    }
+
+    // 2. Buscar citas médicas no facturadas
+    // Descomentar cuando se agregue el campo billing_status a appointments
+    /*
+    const { data: appointments, error: apptError } = await adminSupabase
+      .from('appointments')
+      .select('id, appointment_date, total_amount, status')
+      .eq('patient_id', patientId)
+      .eq('status', 'completed')
+      .is('billing_status', null)
+      .order('appointment_date', { ascending: false });
+
+    if (apptError) {
+      console.error('Error al obtener citas:', apptError);
+    } else if (appointments) {
+      appointments.forEach(appt => {
+        unbilledItems.push({
+          id: appt.id,
+          type: 'appointment',
+          description: `Consulta Médica`,
+          date: appt.appointment_date,
+          amount: Number(appt.total_amount) || 0,
+          details: `Fecha: ${appt.appointment_date}`
+        });
+      });
+    }
+    */
+
+    // 3. Buscar ventas de POS no asociadas a factura
+    const { data: posSales, error: posError } = await adminSupabase
+      .from('pos_sales')
+      .select('id, sale_number, total_amount, created_at')
+      .eq('patient_id', patientId)
+      .is('invoice_id', null)
+      .order('created_at', { ascending: false });
+
+    if (posError) {
+      console.error('Error al obtener ventas POS:', posError);
+    } else if (posSales) {
+      posSales.forEach(sale => {
+        unbilledItems.push({
+          id: sale.id,
+          type: 'pos_sale',
+          description: `Venta Farmacia #${sale.sale_number}`,
+          date: sale.created_at,
+          amount: Number(sale.total_amount) || 0,
+          details: `Venta en mostrador`
+        });
+      });
+    }
+
+    return {
+      success: true,
+      items: unbilledItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    };
+  } catch (error) {
+    console.error('Error al obtener items no facturados:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al obtener items' 
     };
   }
 }
