@@ -202,12 +202,12 @@ CREATE TABLE public.prescriptions (
 CREATE TABLE public.inventory_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   inventory_id UUID REFERENCES public.inventory(id) ON DELETE CASCADE NOT NULL,
-  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('in', 'out', 'adjustment', 'transfer', 'return', 'disposal', 'prescription_dispense')),
+  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('in', 'out', 'adjustment', 'transfer', 'return', 'disposal', 'prescription_dispense', 'sale')),
   quantity INTEGER NOT NULL,
   previous_quantity INTEGER NOT NULL,
   new_quantity INTEGER NOT NULL,
   reference_type TEXT,
-  reference_id UUID,
+  reference_id TEXT,
   notes TEXT,
   performed_by UUID REFERENCES public.profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
