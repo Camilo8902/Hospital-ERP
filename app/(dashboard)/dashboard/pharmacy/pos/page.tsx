@@ -264,6 +264,7 @@ export default function POSTerminalPage() {
           tax: calculateTax(),
           total: calculateTotal(),
         },
+        created_at: new Date().toISOString(),
       });
       
       setShowPaymentModal(false);
