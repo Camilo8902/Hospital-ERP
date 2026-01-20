@@ -187,13 +187,13 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
           )}
         </div>
 
-        {/* Actions */}
+        {/* Actions - Mejorados para móvil */}
         <div className="relative">
-          <div className="flex gap-2 flex-wrap">
-            {/* Ver Detalle Button - Visible for ALL statuses */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+            {/* Ver Detalle Button - Visible for ALL statuses - Más grande en móvil */}
             <Link
               href={`/dashboard/appointments/${appointment.id}`}
-              className="btn-secondary btn-sm flex items-center gap-1"
+              className="btn-secondary btn-md sm:btn-sm flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0"
             >
               <FileText className="w-4 h-4" />
               Ver Detalle
@@ -209,28 +209,28 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
                   });
                 }}
                 disabled={isPending}
-                className="flex-1 btn-primary btn-sm justify-center"
+                className="btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0"
               >
-                {isPending ? '...' : <><Play className="w-4 h-4 mr-1" />Iniciar Consulta</>}
+                {isPending ? '...' : <><Play className="w-4 h-4" />Iniciar</>}
               </button>
             )}
 
             {appointment.status === 'in_progress' && (
               <Link
                 href={`/dashboard/consultation/${appointment.id}`}
-                className="flex-1 btn-primary btn-sm justify-center flex items-center gap-1"
+                className="btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0"
               >
-                <Play className="w-4 h-4 mr-1" />
-                Continuar Consulta
+                <Play className="w-4 h-4" />
+                Continuar
               </Link>
             )}
 
             {appointment.status === 'completed' && (
               <Link
                 href={`/dashboard/consultation/${appointment.id}`}
-                className="flex-1 btn-primary btn-sm justify-center flex items-center gap-1"
+                className="btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0"
               >
-                <Eye className="w-4 h-4 mr-1" />
+                <Eye className="w-4 h-4" />
                 Ver Historia
               </Link>
             )}
@@ -239,7 +239,7 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
             {(appointment.status === 'in_progress' || appointment.status === 'completed') && (
               <Link
                 href={`/dashboard/pharmacy/prescriptions/new?appointment_id=${appointment.id}&patient_id=${appointment.patient_id}`}
-                className="btn-primary btn-sm flex items-center gap-1"
+                className="btn-primary btn-md sm:btn-sm flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0"
               >
                 <Pill className="w-4 h-4" />
                 Receta
@@ -251,7 +251,7 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
               <button
                 onClick={handleCancel}
                 disabled={isPending}
-                className="btn-danger btn-sm flex items-center gap-1"
+                className="btn-danger btn-md sm:btn-sm flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0"
               >
                 <XCircle className="w-4 h-4" />
                 Cancelar

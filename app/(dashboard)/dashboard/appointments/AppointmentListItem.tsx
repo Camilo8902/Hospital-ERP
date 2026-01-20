@@ -206,56 +206,67 @@ export default function AppointmentListItem({ appointment }: AppointmentListItem
             )}
           </div>
 
-          {/* Acciones */}
-          <div className="flex-shrink-0">
-            <div className="flex items-center gap-1">
+          {/* Acciones - Versión móvil con botones más grandes y accesibles */}
+          <div className="flex-shrink-0 ml-2">
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Botón de detalles - más visible en móvil */}
               <Link
                 href={`/dashboard/appointments/${appointment.id}`}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-2 sm:py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors min-w-[44px] sm:min-w-0 justify-center sm:justify-auto"
                 title="Ver detalle"
               >
-                <FileText className="w-4 h-4 text-gray-500" />
+                <FileText className="w-4 h-4 text-gray-600" />
+                <span className="text-xs font-medium text-gray-700 hidden xs:inline">Detalles</span>
               </Link>
-              <Link
-                href={`/dashboard/pharmacy/prescriptions/new?appointment_id=${appointment.id}&patient_id=${appointment.patient_id}`}
-                className="p-2 hover:bg-primary-50 rounded-lg transition-colors"
-                title="Crear receta"
-              >
-                <Pill className="w-4 h-4 text-primary-600" />
-              </Link>
-              
-              <div className="relative ml-1">
+
+              {/* Menú de acciones adicionales - aparece en móvil para agrupar opciones */}
+              <div className="relative">
                 <button
                   onClick={() => setShowActions(!showActions)}
-                  className="btn-secondary btn-sm px-2"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-2 sm:py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors min-w-[44px] sm:min-w-0 justify-center sm:justify-auto"
                 >
-                  <MoreVertical className="w-4 h-4" />
+                  <MoreVertical className="w-4 h-4 text-gray-600" />
+                  <span className="text-xs font-medium text-gray-700 hidden sm:inline">Más</span>
                 </button>
 
                 {showActions && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border py-1 z-10">
-                    {canStart && (
-                      <button onClick={() => handleStatusChange('in_progress')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                        <Play className="w-4 h-4 text-blue-500" /> Iniciar cita
-                      </button>
-                    )}
-                    {canComplete && (
-                      <button onClick={() => handleStatusChange('completed')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" /> Completar
-                      </button>
-                    )}
-                    {canCancel && (
-                      <>
-                        <button onClick={handleCancel} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
-                          <XCircle className="w-4 h-4" /> Cancelar cita
+                  <>
+                    {/* Backdrop para cerrar el menú */}
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowActions(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border py-1 z-50">
+                      <Link
+                        href={`/dashboard/pharmacy/prescriptions/new?appointment_id=${appointment.id}&patient_id=${appointment.patient_id}`}
+                        className="px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                        onClick={() => setShowActions(false)}
+                      >
+                        <Pill className="w-4 h-4 text-primary-600" /> Crear receta
+                      </Link>
+                      {canStart && (
+                        <button onClick={() => handleStatusChange('in_progress')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700">
+                          <Play className="w-4 h-4 text-blue-500" /> Iniciar cita
                         </button>
-                        <hr className="my-1" />
-                        <button onClick={handleDelete} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
-                          <XCircle className="w-4 h-4" /> Eliminar
+                      )}
+                      {canComplete && (
+                        <button onClick={() => handleStatusChange('completed')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700">
+                          <CheckCircle2 className="w-4 h-4 text-green-500" /> Completar
                         </button>
-                      </>
-                    )}
-                  </div>
+                      )}
+                      {canCancel && (
+                        <>
+                          <button onClick={handleCancel} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
+                            <XCircle className="w-4 h-4" /> Cancelar cita
+                          </button>
+                          <hr className="my-1" />
+                          <button onClick={handleDelete} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
+                            <XCircle className="w-4 h-4" /> Eliminar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
