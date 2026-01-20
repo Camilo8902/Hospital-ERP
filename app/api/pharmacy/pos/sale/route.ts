@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { processPOSale } from '@/lib/actions/pharmacy';
-import { getCurrentUser } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/actions/users';
 
 export async function POST(request: Request) {
   try {
@@ -76,7 +76,8 @@ export async function POST(request: Request) {
       items,
       paymentMethod as 'CASH' | 'CARD' | 'TRANSFER' | 'INSURANCE',
       customerName,
-      notes
+      notes,
+      user
     );
 
     if (!result.success) {

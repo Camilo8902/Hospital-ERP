@@ -2,8 +2,8 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
-import { getCurrentUser } from './users';
 import type { POSTransaction, POSStats } from '@/lib/types';
+import type { UserProfile } from './users';
 
 // Tipos específicos para farmacia
 export interface PharmacyProduct {
@@ -43,7 +43,8 @@ export interface InventoryDocument {
 export interface InventoryMovement {
   id: string;
   inventory_id: string;
-  transaction_type: 'in' | 'out' | 'adjustment' | 'transfer' | 'return' | 'disposal' | 'prescription_dispense';
+  type: string;
+  transaction_type: 'in' | 'out' | 'adjustment' | 'transfer' | 'return' | 'disposal' | 'prescription_dispense' | 'sale';
   quantity: number;
   previous_quantity: number;
   new_quantity: number;
@@ -386,11 +387,11 @@ export async function addInventoryMovement(
     notes?: string;
     reference_type?: string;
     reference_id?: string;
-  }
+  },
+  user?: UserProfile | null
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const adminSupabase = createAdminClient();
-    const user = await getCurrentUser();
     
     // Obtener cantidad actual
     const { data: product } = await adminSupabase
@@ -437,7 +438,7 @@ export async function addInventoryMovement(
         .eq('id', movementData.inventory_id);
 
       if (updateError) {
-        // Intentar hacer rollback si falla la actualización (sin .catch ya que no existe en los tipos)
+        // Intentar hacer rollback si falla la actualización
         try {
           await adminSupabase.rpc('ROLLBACK_TRANSACTION');
         } catch (rollbackError) {
@@ -462,7 +463,7 @@ export async function addInventoryMovement(
         });
 
       if (movementError) {
-        // Intentar hacer rollback si falla el registro del movimiento (sin .catch ya que no existe en los tipos)
+        // Intentar hacer rollback si falla el registro del movimiento
         try {
           await adminSupabase.rpc('ROLLBACK_TRANSACTION');
         } catch (rollbackError) {
@@ -471,7 +472,7 @@ export async function addInventoryMovement(
         return { success: false, error: movementError.message };
       }
 
-      // Hacer commit de la transacción (sin .catch ya que no existe en los tipos)
+      // Hacer commit de la transacción
       try {
         await adminSupabase.rpc('COMMIT_TRANSACTION');
       } catch (commitError) {
@@ -529,11 +530,11 @@ export interface StockEntryData {
 }
 
 export async function addStockEntry(
-  entryData: StockEntryData
+  entryData: StockEntryData,
+  user?: UserProfile | null
 ): Promise<{ success: boolean; error?: string; movementId?: string }> {
   try {
     const adminSupabase = createAdminClient();
-    const user = await getCurrentUser();
     
     // Obtener cantidad actual del producto
     const { data: product, error: productError } = await adminSupabase
@@ -865,11 +866,11 @@ export async function createPrescription(
 
 export async function dispensePrescription(
   prescriptionId: string,
-  quantityDispensed?: number
+  quantityDispensed?: number,
+  user?: UserProfile | null
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const adminSupabase = createAdminClient();
-    const user = await getCurrentUser();
     
     // Obtener la receta primero
     const { data: prescription, error: rxError } = await adminSupabase
@@ -1121,15 +1122,16 @@ export interface ProcessPOSaleResult {
 /**
  * Procesa una venta en el punto de venta
  * Maneja la transacción atómicamente: crea registro de venta, descuenta inventario y registra movimientos
+ * Usa la tabla inventory_transactions para registrar la venta completa
  */
 export async function processPOSale(
   items: POSSaleItem[],
   paymentMethod: 'CASH' | 'CARD' | 'TRANSFER' | 'INSURANCE',
   customerName?: string,
-  notes?: string
+  notes?: string,
+  user?: UserProfile | null
 ): Promise<ProcessPOSaleResult> {
   const adminSupabase = createAdminClient();
-  const user = await getCurrentUser();
 
   if (!user) {
     return { success: false, error: 'Usuario no autenticado' };
@@ -1139,16 +1141,16 @@ export async function processPOSale(
     // Generar número de transacción
     const today = new Date().toISOString().split('T')[0];
     const { data: lastTransaction } = await adminSupabase
-      .from('pos_transactions')
-      .select('transaction_number')
-      .like('transaction_number', `POS-${today}-%`)
-      .order('transaction_number', { ascending: false })
+      .from('inventory_transactions')
+      .select('reference_id')
+      .like('reference_id', `POS-${today}-%`)
+      .order('created_at', { ascending: false })
       .limit(1);
 
     let sequence = 1;
     if (lastTransaction && lastTransaction.length > 0) {
-      const lastNumber = lastTransaction[0].transaction_number;
-      const sequenceMatch = lastNumber?.match(/POS-\d{4}-\d{2}-\d{2}-(\d+)/);
+      const lastRef = lastTransaction[0].reference_id;
+      const sequenceMatch = lastRef?.match(/POS-\d{4}-\d{2}-\d{2}-(\d+)/);
       if (sequenceMatch) {
         sequence = parseInt(sequenceMatch[1]) + 1;
       }
@@ -1159,7 +1161,16 @@ export async function processPOSale(
     let subtotal = 0;
     let discountTotal = 0;
 
-    // Verificar stock disponible para todos los productos
+    // Verificar stock disponible para todos los productos y preparar detalles de items
+    const itemDetails: Array<{
+      inventory_id: string;
+      quantity: number;
+      unit_price: number;
+      discount: number;
+      subtotal: number;
+      productName: string;
+    }> = [];
+
     for (const item of items) {
       const { data: product } = await adminSupabase
         .from('inventory')
@@ -1175,99 +1186,184 @@ export async function processPOSale(
         return { success: false, error: `Stock insuficiente para ${product.name}. Disponible: ${product.quantity}, Solicitado: ${item.quantity}` };
       }
 
+      const itemSubtotal = (item.unit_price * item.quantity) - item.discount;
       subtotal += item.unit_price * item.quantity;
       discountTotal += item.discount;
+
+      itemDetails.push({
+        inventory_id: item.inventory_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount: item.discount,
+        subtotal: itemSubtotal,
+        productName: product.name,
+      });
     }
 
     const taxRate = 0.16; // 16% IVA
     const taxAmount = (subtotal - discountTotal) * taxRate;
     const totalAmount = subtotal - discountTotal + taxAmount;
 
+    // Preparar detalles completos de la venta como JSON
+    const saleDetails = JSON.stringify({
+      transaction_number: transactionNumber,
+      payment_method: paymentMethod,
+      customer_name: customerName || null,
+      items: itemDetails,
+      subtotal: subtotal,
+      discount_total: discountTotal,
+      tax_amount: taxAmount,
+      total_amount: totalAmount,
+      items_count: items.reduce((sum, item) => sum + item.quantity, 0),
+    });
+
     // Iniciar transacción de base de datos
-    await adminSupabase.rpc('BEGIN_TRANSACTION');
-
-    try {
-      // Crear registro de transacción POS
-      const { data: transaction, error: transactionError } = await adminSupabase
-        .from('pos_transactions')
-        .insert({
-          transaction_number: transactionNumber,
-          status: 'COMPLETED',
-          payment_method: paymentMethod,
-          subtotal: subtotal,
-          discount_total: discountTotal,
-          tax_amount: taxAmount,
-          total_amount: totalAmount,
-          items_count: items.reduce((sum, item) => sum + item.quantity, 0),
-          customer_name: customerName || null,
-          notes: notes || null,
-          operator_id: user.id,
-        })
-        .select()
-        .single();
-
-      if (transactionError) {
-        throw transactionError;
-      }
-
-      // Crear items de transacción y actualizar inventario
-      for (const item of items) {
-        const itemSubtotal = (item.unit_price * item.quantity) - item.discount;
-
-        // Insertar item de transacción
-        const { error: itemError } = await adminSupabase
-          .from('pos_transaction_items')
-          .insert({
-            transaction_id: transaction.id,
-            inventory_id: item.inventory_id,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            discount: item.discount,
-            subtotal: itemSubtotal,
-          });
-
-        if (itemError) {
-          throw itemError;
-        }
-
-        // Actualizar inventario
+    const { error: beginError } = await adminSupabase.rpc('BEGIN_TRANSACTION');
+    
+    if (beginError) {
+      // Si RPC no está disponible, ejecutar sin transacción explícita
+      // Registrar cada movimiento de inventario para los items
+      for (const item of itemDetails) {
+        // Obtener cantidad actual
         const { data: product } = await adminSupabase
           .from('inventory')
           .select('quantity')
           .eq('id', item.inventory_id)
           .single();
 
-        if (product) {
-          const newQuantity = product.quantity - item.quantity;
-
-          const { error: updateError } = await adminSupabase
-            .from('inventory')
-            .update({ quantity: newQuantity })
-            .eq('id', item.inventory_id);
-
-          if (updateError) {
-            throw updateError;
-          }
-
-          // Registrar movimiento de inventario
-          const { error: movementError } = await adminSupabase
-            .from('inventory_transactions')
-            .insert({
-              inventory_id: item.inventory_id,
-              transaction_type: 'out',
-              quantity: item.quantity,
-              previous_quantity: product.quantity,
-              new_quantity: newQuantity,
-              notes: `Venta POS: ${transactionNumber}`,
-              reference_type: 'pos_sale',
-              reference_id: transaction.id,
-              performed_by: user.id,
-            });
-
-          if (movementError) {
-            throw movementError;
-          }
+        if (!product) {
+          return { success: false, error: `Producto no encontrado: ${item.inventory_id}` };
         }
+
+        const previousQuantity = product.quantity;
+        const newQuantity = previousQuantity - item.quantity;
+
+        // Actualizar inventario
+        const { error: updateError } = await adminSupabase
+          .from('inventory')
+          .update({ quantity: newQuantity })
+          .eq('id', item.inventory_id);
+
+        if (updateError) {
+          return { success: false, error: updateError.message };
+        }
+
+        // Registrar movimiento individual
+        const { error: movementError } = await adminSupabase
+          .from('inventory_transactions')
+          .insert({
+            inventory_id: item.inventory_id,
+            transaction_type: 'sale',
+            quantity: item.quantity,
+            previous_quantity: previousQuantity,
+            new_quantity: newQuantity,
+            notes: `Venta POS: ${transactionNumber}. ${item.productName} x${item.quantity}`,
+            reference_type: 'pos_sale',
+            reference_id: transactionNumber,
+            performed_by: user.id,
+          });
+
+        if (movementError) {
+          return { success: false, error: movementError.message };
+        }
+      }
+
+      // Crear registro maestro de la venta con todos los detalles
+      const { error: masterError } = await adminSupabase
+        .from('inventory_transactions')
+        .insert({
+          inventory_id: items[0]?.inventory_id || '',
+          transaction_type: 'sale',
+          quantity: 0,
+          previous_quantity: 0,
+          new_quantity: 0,
+          notes: saleDetails,
+          reference_type: 'pos_sale_master',
+          reference_id: transactionNumber,
+          performed_by: user.id,
+        });
+
+      if (masterError) {
+        console.error('Error al crear registro maestro de venta:', masterError);
+        // No fallamos la operación por esto, los movimientos individuales ya fueron registrados
+      }
+
+      revalidatePath('/dashboard/pharmacy');
+      revalidatePath('/dashboard/pharmacy/pos');
+      revalidatePath('/dashboard/pharmacy/inventory');
+
+      return {
+        success: true,
+        transaction_id: transactionNumber,
+        transaction_number: transactionNumber,
+      };
+    }
+
+    try {
+      // Registrar cada movimiento de inventario para los items
+      for (const item of itemDetails) {
+        // Obtener cantidad actual
+        const { data: product } = await adminSupabase
+          .from('inventory')
+          .select('quantity')
+          .eq('id', item.inventory_id)
+          .single();
+
+        if (!product) {
+          throw new Error(`Producto no encontrado: ${item.inventory_id}`);
+        }
+
+        const previousQuantity = product.quantity;
+        const newQuantity = previousQuantity - item.quantity;
+
+        // Actualizar inventario
+        const { error: updateError } = await adminSupabase
+          .from('inventory')
+          .update({ quantity: newQuantity })
+          .eq('id', item.inventory_id);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // Registrar movimiento individual
+        const { error: movementError } = await adminSupabase
+          .from('inventory_transactions')
+          .insert({
+            inventory_id: item.inventory_id,
+            transaction_type: 'sale',
+            quantity: item.quantity,
+            previous_quantity: previousQuantity,
+            new_quantity: newQuantity,
+            notes: `Venta POS: ${transactionNumber}. ${item.productName} x${item.quantity}`,
+            reference_type: 'pos_sale',
+            reference_id: transactionNumber,
+            performed_by: user.id,
+          });
+
+        if (movementError) {
+          throw movementError;
+        }
+      }
+
+      // Crear registro maestro de la venta con todos los detalles
+      const { error: masterError } = await adminSupabase
+        .from('inventory_transactions')
+        .insert({
+          inventory_id: items[0]?.inventory_id || '',
+          transaction_type: 'sale',
+          quantity: 0,
+          previous_quantity: 0,
+          new_quantity: 0,
+          notes: saleDetails,
+          reference_type: 'pos_sale_master',
+          reference_id: transactionNumber,
+          performed_by: user.id,
+        });
+
+      if (masterError) {
+        console.error('Error al crear registro maestro de venta:', masterError);
+        // No fallamos la operación por esto, los movimientos individuales ya fueron registrados
       }
 
       // Hacer commit de la transacción
@@ -1279,7 +1375,7 @@ export async function processPOSale(
 
       return {
         success: true,
-        transaction_id: transaction.id,
+        transaction_id: transactionNumber,
         transaction_number: transactionNumber,
       };
     } catch (error) {
@@ -1342,6 +1438,7 @@ export async function getProductStock(productId: string): Promise<number> {
 
 /**
  * Obtiene transacciones POS por fecha
+ * Busca registros master de ventas en inventory_transactions
  */
 export async function getPOSTransactions(
   startDate?: string,
@@ -1351,8 +1448,9 @@ export async function getPOSTransactions(
   const adminSupabase = createAdminClient();
 
   let query = adminSupabase
-    .from('pos_transactions')
+    .from('inventory_transactions')
     .select('*')
+    .eq('reference_type', 'pos_sale_master')
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -1371,17 +1469,45 @@ export async function getPOSTransactions(
     return [];
   }
 
-  // Obtener items para cada transacción
-  const transactions = data || [];
+  // Convertir registros inventory_transactions a formato POSTransaction
+  const transactions: POSTransaction[] = (data || []).map(tx => {
+    let saleDetails = {
+      transaction_number: tx.reference_id,
+      payment_method: 'CASH' as const,
+      customer_name: null,
+      items_count: 0,
+      subtotal: 0,
+      discount_total: 0,
+      tax_amount: 0,
+      total_amount: 0,
+    };
 
-  for (const tx of transactions) {
-    const { data: items } = await adminSupabase
-      .from('pos_transaction_items')
-      .select('*')
-      .eq('transaction_id', tx.id);
+    try {
+      if (tx.notes) {
+        saleDetails = { ...saleDetails, ...JSON.parse(tx.notes) };
+      }
+    } catch (e) {
+      // Si no se puede parsear, usar valores por defecto
+    }
 
-    tx.items = items || [];
-  }
+    return {
+      id: tx.id,
+      transaction_number: tx.reference_id || '',
+      status: 'COMPLETED',
+      payment_method: saleDetails.payment_method,
+      subtotal: saleDetails.subtotal,
+      discount_total: saleDetails.discount_total,
+      tax_amount: saleDetails.tax_amount,
+      total_amount: saleDetails.total_amount,
+      items_count: saleDetails.items_count,
+      customer_name: saleDetails.customer_name,
+      notes: tx.notes || null,
+      operator_id: tx.performed_by || null,
+      created_at: tx.created_at,
+      updated_at: tx.created_at,
+      items: [],
+    };
+  });
 
   return transactions;
 }
@@ -1396,13 +1522,13 @@ export async function getPOSStats(): Promise<POSStats> {
   const startOfDay = `${today}T00:00:00`;
   const endOfDay = `${today}T23:59:59`;
 
-  // Obtener transacciones del día
-  const { data: transactions, error } = await adminSupabase
-    .from('pos_transactions')
-    .select('total_amount')
+  // Obtener transacciones master del día
+  const { data: masterTransactions, error } = await adminSupabase
+    .from('inventory_transactions')
+    .select('notes, reference_id')
+    .eq('reference_type', 'pos_sale_master')
     .gte('created_at', startOfDay)
-    .lte('created_at', endOfDay)
-    .eq('status', 'COMPLETED');
+    .lte('created_at', endOfDay);
 
   if (error) {
     console.error('Error al obtener estadísticas POS:', error);
@@ -1414,37 +1540,38 @@ export async function getPOSStats(): Promise<POSStats> {
     };
   }
 
-  const transactionCount = transactions?.length || 0;
-  const totalSales = transactions?.reduce((sum, tx) => sum + tx.total_amount, 0) || 0;
-  const averageTicket = transactionCount > 0 ? totalSales / transactionCount : 0;
-
-  // Obtener productos más vendidos hoy
-  const { data: topItems } = await adminSupabase
-    .from('pos_transaction_items')
-    .select(`
-      inventory_id,
-      name,
-      quantity,
-      subtotal
-    `)
-    .gte('created_at', startOfDay)
-    .lte('created_at', endOfDay);
-
+  let transactionCount = 0;
+  let totalSales = 0;
   const productSales: Record<string, { name: string; quantity_sold: number; revenue: number }> = {};
 
-  if (topItems) {
-    for (const item of topItems) {
-      if (!productSales[item.inventory_id]) {
-        productSales[item.inventory_id] = {
-          name: item.name,
-          quantity_sold: 0,
-          revenue: 0,
-        };
+  for (const tx of masterTransactions || []) {
+    try {
+      if (tx.notes) {
+        const details = JSON.parse(tx.notes);
+        totalSales += details.total_amount || 0;
+        transactionCount++;
+
+        // Acumular productos vendidos
+        if (details.items && Array.isArray(details.items)) {
+          for (const item of details.items) {
+            if (!productSales[item.inventory_id]) {
+              productSales[item.inventory_id] = {
+                name: item.productName || 'Producto',
+                quantity_sold: 0,
+                revenue: 0,
+              };
+            }
+            productSales[item.inventory_id].quantity_sold += item.quantity;
+            productSales[item.inventory_id].revenue += item.subtotal || (item.unit_price * item.quantity);
+          }
+        }
       }
-      productSales[item.inventory_id].quantity_sold += item.quantity;
-      productSales[item.inventory_id].revenue += item.subtotal;
+    } catch (e) {
+      // Si no se puede parsear, ignorar
     }
   }
+
+  const averageTicket = transactionCount > 0 ? totalSales / transactionCount : 0;
 
   const topSellingProducts = Object.values(productSales)
     .sort((a, b) => b.quantity_sold - a.quantity_sold)
@@ -1463,19 +1590,19 @@ export async function getPOSStats(): Promise<POSStats> {
  */
 export async function cancelPOSTransaction(
   transactionId: string,
-  reason: string
+  reason: string,
+  user?: UserProfile | null
 ): Promise<{ success: boolean; error?: string }> {
   const adminSupabase = createAdminClient();
-  const user = await getCurrentUser();
 
   if (!user) {
     return { success: false, error: 'Usuario no autenticado' };
   }
 
   try {
-    // Obtener la transacción actual
+    // Obtener la transacción master
     const { data: transaction, error: txError } = await adminSupabase
-      .from('pos_transactions')
+      .from('inventory_transactions')
       .select('*')
       .eq('id', transactionId)
       .single();
@@ -1484,88 +1611,102 @@ export async function cancelPOSTransaction(
       return { success: false, error: 'Transacción no encontrada' };
     }
 
-    if (transaction.status !== 'COMPLETED') {
-      return { success: false, error: 'La transacción no puede ser cancelada' };
+    if (transaction.reference_type !== 'pos_sale_master') {
+      return { success: false, error: 'Esta no es una transacción POS válida' };
     }
 
-    // Obtener items de la transacción
-    const { data: items, error: itemsError } = await adminSupabase
-      .from('pos_transaction_items')
-      .select('*')
-      .eq('transaction_id', transactionId);
+    // Parsear detalles de la venta
+    let saleDetails: {
+      transaction_number: string;
+      items: Array<{
+        inventory_id: string;
+        quantity: number;
+        productName: string;
+      }>;
+    } | null = null;
 
-    if (itemsError) {
-      return { success: false, error: itemsError.message };
+    try {
+      if (transaction.notes) {
+        saleDetails = JSON.parse(transaction.notes);
+      }
+    } catch (e) {
+      return { success: false, error: 'No se pudieron leer los detalles de la transacción' };
+    }
+
+    if (!saleDetails || !saleDetails.items) {
+      return { success: false, error: 'No hay items en esta transacción' };
     }
 
     // Iniciar transacción
-    await adminSupabase.rpc('BEGIN_TRANSACTION');
+    const { error: beginError } = await adminSupabase.rpc('BEGIN_TRANSACTION');
 
     try {
-      // Actualizar estado de la transacción
-      const { error: updateError } = await adminSupabase
-        .from('pos_transactions')
-        .update({
-          status: 'CANCELLED',
-          notes: `Cancelada: ${reason}. Original: ${transaction.notes || ''}`,
-        })
-        .eq('id', transactionId);
-
-      if (updateError) {
-        throw updateError;
+      if (!beginError) {
+        await adminSupabase.rpc('COMMIT_TRANSACTION');
       }
+    } catch (e) {
+      // Continuar sin transacción explícita
+    }
 
-      // Restaurar inventario para cada item
-      for (const item of items || []) {
-        const { data: product } = await adminSupabase
+    // Restaurar inventario para cada item
+    for (const item of saleDetails.items) {
+      const { data: product } = await adminSupabase
+        .from('inventory')
+        .select('id, quantity')
+        .eq('id', item.inventory_id)
+        .single();
+
+      if (product) {
+        const previousQuantity = product.quantity;
+        const newQuantity = previousQuantity + item.quantity;
+
+        const { error: invError } = await adminSupabase
           .from('inventory')
-          .select('id, quantity')
-          .eq('id', item.inventory_id)
-          .single();
+          .update({ quantity: newQuantity })
+          .eq('id', item.inventory_id);
 
-        if (product) {
-          const newQuantity = product.quantity + item.quantity;
+        if (invError) {
+          return { success: false, error: invError.message };
+        }
 
-          const { error: invError } = await adminSupabase
-            .from('inventory')
-            .update({ quantity: newQuantity })
-            .eq('id', item.inventory_id);
+        // Registrar movimiento de restauración
+        const { error: movementError } = await adminSupabase
+          .from('inventory_transactions')
+          .insert({
+            inventory_id: item.inventory_id,
+            transaction_type: 'return',
+            quantity: item.quantity,
+            previous_quantity: previousQuantity,
+            new_quantity: newQuantity,
+            notes: `Cancelación POS: ${saleDetails.transaction_number}. Motivo: ${reason}`,
+            reference_type: 'pos_cancellation',
+            reference_id: transactionId,
+            performed_by: user.id,
+          });
 
-          if (invError) {
-            throw invError;
-          }
-
-          // Registrar movimiento de restauración
-          const { error: movementError } = await adminSupabase
-            .from('inventory_transactions')
-            .insert({
-              inventory_id: item.inventory_id,
-              transaction_type: 'return',
-              quantity: item.quantity,
-              previous_quantity: product.quantity,
-              new_quantity: newQuantity,
-              notes: `Cancelación POS: ${transaction.transaction_number}. Motivo: ${reason}`,
-              reference_type: 'pos_cancellation',
-              reference_id: transactionId,
-              performed_by: user.id,
-            });
-
-          if (movementError) {
-            throw movementError;
-          }
+        if (movementError) {
+          return { success: false, error: movementError.message };
         }
       }
-
-      await adminSupabase.rpc('COMMIT_TRANSACTION');
-
-      revalidatePath('/dashboard/pharmacy/pos');
-      revalidatePath('/dashboard/pharmacy/inventory');
-
-      return { success: true };
-    } catch (error) {
-      await adminSupabase.rpc('ROLLBACK_TRANSACTION');
-      throw error;
     }
+
+    // Marcar la transacción master como cancelada
+    const { error: updateError } = await adminSupabase
+      .from('inventory_transactions')
+      .update({
+        notes: `${transaction.notes}\n\n[CANCELADA]: ${reason}. Cancelada por: ${user.id} el ${new Date().toISOString()}`,
+      })
+      .eq('id', transactionId);
+
+    if (updateError) {
+      console.error('Error al marcar transacción como cancelada:', updateError);
+      // No fallamos por esto
+    }
+
+    revalidatePath('/dashboard/pharmacy/pos');
+    revalidatePath('/dashboard/pharmacy/inventory');
+
+    return { success: true };
   } catch (error) {
     console.error('Error al cancelar transacción POS:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Error al cancelar la transacción' };
