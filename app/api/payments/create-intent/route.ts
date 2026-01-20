@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPaymentIntent } from '@/lib/actions/payments';
+import { createPaymentIntent, CreatePaymentIntentDTO } from '@/lib/actions/payments';
 import { getCurrentUser } from '@/lib/supabase/server';
-import type { CreatePaymentIntentDTO, CreatePaymentIntentResponse } from '@/lib/types';
+
+interface CreatePaymentIntentResponse {
+  success: boolean;
+  clientSecret?: string;
+  transactionId?: string;
+  providerPaymentIntentId?: string;
+  error?: string;
+}
 
 // ============================================
 // POST /api/payments/create-intent
@@ -20,19 +27,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreatePay
     }
 
     // Parsear el cuerpo de la solicitud
-    const body: CreatePaymentIntentDTO = await request.json();
+    const body = await request.json();
 
     // Validaciones básicas
     if (!body.amount || body.amount <= 0) {
       return NextResponse.json(
         { success: false, error: 'El monto es requerido y debe ser mayor a 0' },
-        { status: 400 }
-      );
-    }
-
-    if (!body.paymentMethod) {
-      return NextResponse.json(
-        { success: false, error: 'El método de pago es requerido' },
         { status: 400 }
       );
     }
@@ -44,8 +44,30 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreatePay
       );
     }
 
+    // Validar tipo de referencia
+    const validReferenceTypes = ['INVOICE', 'LAB_ORDER'];
+    if (!validReferenceTypes.includes(body.referenceType)) {
+      return NextResponse.json(
+        { success: false, error: 'Tipo de referencia inválido' },
+        { status: 400 }
+      );
+    }
+
     // Crear la intención de pago
-    const result = await createPaymentIntent(body);
+    const paymentData: CreatePaymentIntentDTO = {
+      amount: body.amount,
+      currency: body.currency,
+      paymentMethod: body.paymentMethod,
+      description: body.description,
+      customerEmail: body.customerEmail,
+      customerName: body.customerName,
+      customerPhone: body.customerPhone,
+      referenceType: body.referenceType,
+      referenceId: body.referenceId,
+      metadata: body.metadata,
+    };
+
+    const result = await createPaymentIntent(paymentData);
 
     if (!result.success) {
       return NextResponse.json(

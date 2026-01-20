@@ -3,20 +3,11 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from './users';
-import type { 
-  PaymentTransaction, 
-  PaymentRefund, 
-  CreatePaymentIntentDTO,
-  ProcessRefundDTO,
-  PaymentStats 
-} from '@/lib/types';
+import type { PaymentStats } from '@/lib/types';
 
 // ============================================
 // CONFIGURACIÓN DE STRIPE (Simulada para Fase 1)
 // ============================================
-
-// En producción, usar: import Stripe from 'stripe';
-// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' });
 
 interface StripePaymentIntent {
   id: string;
@@ -33,573 +24,73 @@ interface StripeRefund {
 }
 
 // ============================================
+// TIPOS BASADOS EN EL ESQUEMA SQL
+// ============================================
+
+interface Invoice {
+  id: string;
+  invoice_number: string;
+  patient_id: string;
+  appointment_id: string | null;
+  status: string;
+  subtotal: number;
+  tax_amount: number;
+  discount_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  payment_method: string | null;
+  payment_reference: string | null;
+  items: Array<{
+    id?: string;
+    description: string;
+    service_code?: string;
+    quantity: number;
+    unit_price: number;
+    total: number;
+  }>;
+  due_date: string;
+  issued_date: string;
+  paid_date: string | null;
+  created_at: string;
+}
+
+interface LabOrder {
+  id: string;
+  order_number: string;
+  patient_id: string;
+  payment_status: string;
+  total_amount: number;
+  created_at: string;
+}
+
+// ============================================
 // FUNCIONES AUXILIARES
 // ============================================
 
-/**
- * Convierte euros a céntimos
- */
 function eurToCents(eurAmount: number): number {
   return Math.round(eurAmount * 100);
 }
 
-/**
- * Convierte céntimos a euros
- */
 function centsToEur(centsAmount: number): number {
   return centsAmount / 100;
 }
 
-/**
- * Genera un número de referencia único para la transacción
- */
 function generatePaymentReference(): string {
   const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
   const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
   return `PAY-${today}-${random}`;
 }
 
-/**
- * Mapea el tipo de método de pago al código de Stripe
- */
 function mapPaymentMethodToStripe(method: string): string {
   switch (method) {
     case 'CARD':
       return 'card';
     case 'BIZUM':
-      return 'card'; // Bizum se procesa como tarjeta a través de Stripe
+      return 'card';
     case 'SEPA_DEBIT':
       return 'sepa_debit';
     default:
       return 'card';
-  }
-}
-
-// ============================================
-// CREAR INTENCIÓN DE PAGO
-// ============================================
-
-export interface CreatePaymentIntentResult {
-  success: boolean;
-  clientSecret?: string;
-  transactionId?: string;
-  providerPaymentIntentId?: string;
-  error?: string;
-}
-
-/**
- * Crea una intención de pago en Stripe y registra la transacción en la base de datos
- * 
- * @param paymentData - Datos para crear el pago
- * @returns Resultado con el clientSecret para completar el pago en el cliente
- */
-export async function createPaymentIntent(
-  paymentData: CreatePaymentIntentDTO
-): Promise<CreatePaymentIntentResult> {
-  const adminSupabase = createAdminClient();
-  const user = await getCurrentUser();
-
-  // Verificar que el usuario tiene permisos
-  if (!user) {
-    return { success: false, error: 'Usuario no autenticado' };
-  }
-
-  try {
-    // Validar el monto (debe ser positivo)
-    if (paymentData.amount <= 0) {
-      return { success: false, error: 'El monto debe ser mayor a 0' };
-    }
-
-    // Generar referencia única
-    const paymentReference = generatePaymentReference();
-
-    // En producción, crear el PaymentIntent en Stripe:
-    /*
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: paymentData.amount,
-      currency: paymentData.currency || 'eur',
-      payment_method_types: [mapPaymentMethodToStripe(paymentData.paymentMethod)],
-      metadata: {
-        reference_type: paymentData.referenceType,
-        reference_id: paymentData.referenceId,
-        internal_reference: paymentReference,
-      },
-      description: paymentData.description || `Pago para ${paymentData.referenceType}`,
-      receipt_email: paymentData.customerEmail,
-      statement_descriptor: 'MEDICORE ERP',
-      // Para SEPA Debit
-      setup_future_usage: paymentData.paymentMethod === 'SEPA_DEBIT' ? 'off_session' : undefined,
-    });
-    */
-
-    // Simular creación de PaymentIntent para desarrollo
-    const mockPaymentIntent: StripePaymentIntent = {
-      id: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      client_secret: `pi_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`,
-      status: 'requires_payment_method',
-      amount: paymentData.amount,
-      currency: paymentData.currency || 'eur',
-    };
-
-    // Registrar la transacción en la base de datos
-    const { data: transaction, error: txError } = await adminSupabase
-      .from('payment_transactions')
-      .insert({
-        amount: paymentData.amount,
-        currency: paymentData.currency || 'EUR',
-        status: 'PENDING',
-        payment_method: paymentData.paymentMethod,
-        provider: 'STRIPE',
-        provider_payment_intent_id: mockPaymentIntent.id,
-        description: paymentData.description || `Pago para ${paymentData.referenceType}`,
-        customer_email: paymentData.customerEmail,
-        customer_name: paymentData.customerName,
-        customer_phone: paymentData.customerPhone,
-        reference_type: paymentData.referenceType,
-        reference_id: paymentData.referenceId,
-        metadata: {
-          ...paymentData.metadata,
-          operator_id: user.id,
-          operator_email: user.email,
-        },
-      })
-      .select()
-      .single();
-
-    if (txError) {
-      console.error('Error al registrar transacción de pago:', txError);
-      return { success: false, error: 'Error al registrar la transacción' };
-    }
-
-    // Actualizar la entidad relacionada (orden de laboratorio, consulta, etc.)
-    if (paymentData.referenceType === 'LAB_ORDER') {
-      await adminSupabase
-        .from('lab_orders')
-        .update({ is_paid: false }) // Se marcará como pagado cuando webhook confirme
-        .eq('id', paymentData.referenceId);
-    }
-
-    revalidatePath('/dashboard/billing');
-    revalidatePath('/dashboard/lab/orders');
-
-    return {
-      success: true,
-      clientSecret: mockPaymentIntent.client_secret,
-      transactionId: transaction.id,
-      providerPaymentIntentId: mockPaymentIntent.id,
-    };
-  } catch (error) {
-    console.error('Error al crear intención de pago:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error al crear la intención de pago' 
-    };
-  }
-}
-
-// ============================================
-// CONFIRMAR PAGO (DESDE WEBHOOK O CONFIRMACIÓN MANUAL)
-// ============================================
-
-export interface ConfirmPaymentResult {
-  success: boolean;
-  transaction?: PaymentTransaction;
-  error?: string;
-}
-
-/**
- * Confirma un pago y actualiza el estado de la transacción
- * Este método es llamado principalmente desde el webhook de Stripe
- */
-export async function confirmPayment(
-  providerPaymentIntentId: string,
-  status: 'SUCCEEDED' | 'FAILED' | 'PROCESSING',
-  additionalData?: {
-    providerTransactionId?: string;
-    metadata?: Record<string, unknown>;
-  }
-): Promise<ConfirmPaymentResult> {
-  const adminSupabase = createAdminClient();
-
-  try {
-    // Buscar la transacción por el ID de PaymentIntent de Stripe
-    const { data: transaction, error: findError } = await adminSupabase
-      .from('payment_transactions')
-      .select('*')
-      .eq('provider_payment_intent_id', providerPaymentIntentId)
-      .single();
-
-    if (findError || !transaction) {
-      return { success: false, error: 'Transacción no encontrada' };
-    }
-
-    // Actualizar el estado de la transacción
-    const updateData: Record<string, unknown> = {
-      status: status,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (status === 'SUCCEEDED') {
-      updateData.completed_at = new Date().toISOString();
-      updateData.provider_transaction_id = additionalData?.providerTransactionId || providerPaymentIntentId;
-    }
-
-    if (additionalData?.metadata) {
-      updateData.metadata = {
-        ...transaction.metadata,
-        ...additionalData.metadata,
-        confirmed_at: new Date().toISOString(),
-      };
-    }
-
-    const { data: updatedTransaction, error: updateError } = await adminSupabase
-      .from('payment_transactions')
-      .update(updateData)
-      .eq('id', transaction.id)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.error('Error al confirmar pago:', updateError);
-      return { success: false, error: 'Error al actualizar la transacción' };
-    }
-
-    // Si el pago fue exitoso, marcar la entidad relacionada como pagada
-    if (status === 'SUCCEEDED' && transaction.reference_type && transaction.reference_id) {
-      const referenceType = transaction.reference_type;
-      const referenceId = transaction.reference_id;
-
-      switch (referenceType) {
-        case 'LAB_ORDER':
-          await adminSupabase
-            .from('lab_orders')
-            .update({ is_paid: true })
-            .eq('id', referenceId);
-          break;
-          
-        case 'CONSULTATION':
-          // Actualizar estado de la cita/consulta si es necesario
-          break;
-          
-        case 'INVOICE':
-          await adminSupabase
-            .from('invoices')
-            .update({ 
-              status: 'paid',
-              amount_paid: transaction.amount,
-              paid_date: new Date().toISOString().split('T')[0],
-              payment_method: transaction.payment_method,
-              payment_reference: transaction.id,
-            })
-            .eq('id', referenceId);
-          break;
-      }
-
-      // Revalidar páginas relevantes
-      revalidatePath('/dashboard/billing');
-      revalidatePath('/dashboard/lab/orders');
-    }
-
-    return { success: true, transaction: updatedTransaction as PaymentTransaction };
-  } catch (error) {
-    console.error('Error al confirmar pago:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error al confirmar el pago' 
-    };
-  }
-}
-
-// ============================================
-// OBTENER TRANSACCIÓN POR ID
-// ============================================
-
-export async function getPaymentTransaction(
-  transactionId: string
-): Promise<PaymentTransaction | null> {
-  const adminSupabase = createAdminClient();
-
-  try {
-    const { data, error } = await adminSupabase
-      .from('payment_transactions')
-      .select('*')
-      .eq('id', transactionId)
-      .single();
-
-    if (error || !data) {
-      return null;
-    }
-
-    return data as PaymentTransaction;
-  } catch (error) {
-    console.error('Error al obtener transacción:', error);
-    return null;
-  }
-}
-
-// ============================================
-// OBTENER TRANSACCIONES POR REFERENCIA
-// ============================================
-
-export async function getPaymentTransactionsByReference(
-  referenceType: string,
-  referenceId: string
-): Promise<PaymentTransaction[]> {
-  const adminSupabase = createAdminClient();
-
-  try {
-    const { data, error } = await adminSupabase
-      .from('payment_transactions')
-      .select('*')
-      .eq('reference_type', referenceType)
-      .eq('reference_id', referenceId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error al obtener transacciones:', error);
-      return [];
-    }
-
-    return (data || []) as PaymentTransaction[];
-  } catch (error) {
-    console.error('Error al obtener transacciones por referencia:', error);
-    return [];
-  }
-}
-
-// ============================================
-// PROCESAR REEMBOLSO
-// ============================================
-
-export interface RefundPaymentResult {
-  success: boolean;
-  refund?: PaymentRefund;
-  transaction?: PaymentTransaction;
-  error?: string;
-}
-
-/**
- * Procesa un reembolso para una transacción
- */
-export async function refundPayment(
-  transactionId: string,
-  refundData: ProcessRefundDTO
-): Promise<RefundPaymentResult> {
-  const adminSupabase = createAdminClient();
-  const user = await getCurrentUser();
-
-  if (!user) {
-    return { success: false, error: 'Usuario no autenticado' };
-  }
-
-  try {
-    // Obtener la transacción original
-    const { data: transaction, error: findError } = await adminSupabase
-      .from('payment_transactions')
-      .select('*')
-      .eq('id', transactionId)
-      .single();
-
-    if (findError || !transaction) {
-      return { success: false, error: 'Transacción no encontrada' };
-    }
-
-    // Verificar que la transacción puede ser reembolsada
-    if (transaction.status !== 'SUCCEEDED') {
-      return { success: false, error: 'La transacción no está completada' };
-    }
-
-    // Calcular el monto a reembolsar
-    const refundAmount = refundData.amount 
-      ? Math.min(refundData.amount, transaction.amount - transaction.refunded_amount)
-      : transaction.amount - transaction.refunded_amount;
-
-    if (refundAmount <= 0) {
-      return { success: false, error: 'El monto de reembolso es inválido o ya se reembolsó completamente' };
-    }
-
-    // En producción, crear el reembolso en Stripe:
-    /*
-    const stripeRefund = await stripe.refunds.create({
-      payment_intent: transaction.provider_payment_intent_id,
-      amount: refundAmount,
-      reason: 'requested_by_customer',
-      metadata: {
-        transaction_id: transactionId,
-        reason: refundData.reason,
-      },
-    });
-    */
-
-    // Simular reembolso
-    const mockRefund: StripeRefund = {
-      id: `re_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      status: 'succeeded',
-      amount: refundAmount,
-    };
-
-    // Iniciar transacción de base de datos
-    await adminSupabase.rpc('BEGIN_TRANSACTION');
-
-    try {
-      // Registrar el reembolso
-      const { data: refund, error: refundError } = await adminSupabase
-        .from('payment_refunds')
-        .insert({
-          transaction_id: transactionId,
-          amount: refundAmount,
-          currency: transaction.currency,
-          status: 'SUCCEEDED',
-          provider_refund_id: mockRefund.id,
-          reason: refundData.reason,
-          notes: refundData.notes,
-          processed_by: user.id,
-          completed_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (refundError) {
-        throw refundError;
-      }
-
-      // Actualizar el estado de la transacción
-      const newRefundedAmount = transaction.refunded_amount + refundAmount;
-      const newStatus = newRefundedAmount >= transaction.amount 
-        ? 'REFUNDED' 
-        : 'PARTIALLY_REFUNDED';
-
-      const { data: updatedTransaction, error: updateError } = await adminSupabase
-        .from('payment_transactions')
-        .update({
-          status: newStatus,
-          refunded_amount: newRefundedAmount,
-          refund_reason: refundData.reason,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', transactionId)
-        .select()
-        .single();
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Si está completamente reembolsada, actualizar la entidad relacionada
-      if (newStatus === 'REFUNDED' && transaction.reference_type && transaction.reference_id) {
-        switch (transaction.reference_type) {
-          case 'LAB_ORDER':
-            await adminSupabase
-              .from('lab_orders')
-              .update({ is_paid: false })
-              .eq('id', transaction.reference_id);
-            break;
-          case 'INVOICE':
-            await adminSupabase
-              .from('invoices')
-              .update({ 
-                status: 'pending',
-                amount_paid: 0,
-                paid_date: null,
-              })
-              .eq('id', transaction.reference_id);
-            break;
-        }
-      }
-
-      await adminSupabase.rpc('COMMIT_TRANSACTION');
-
-      revalidatePath('/dashboard/billing');
-      revalidatePath('/dashboard/lab/orders');
-
-      return {
-        success: true,
-        refund: refund as PaymentRefund,
-        transaction: updatedTransaction as PaymentTransaction,
-      };
-    } catch (error) {
-      await adminSupabase.rpc('ROLLBACK_TRANSACTION');
-      throw error;
-    }
-  } catch (error) {
-    console.error('Error al procesar reembolso:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error al procesar el reembolso' 
-    };
-  }
-}
-
-// ============================================
-// OBTENER ESTADÍSTICAS DE PAGOS
-// ============================================
-
-export async function getPaymentStats(
-  startDate?: string,
-  endDate?: string
-): Promise<PaymentStats> {
-  const adminSupabase = createAdminClient();
-
-  try {
-    let query = adminSupabase
-      .from('payment_transactions')
-      .select('status, payment_method, amount, refunded_amount');
-
-    if (startDate) {
-      query = query.gte('created_at', startDate);
-    }
-
-    if (endDate) {
-      query = query.lte('created_at', endDate);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error al obtener estadísticas:', error);
-      return getEmptyPaymentStats();
-    }
-
-    const transactions = data || [];
-    
-    // Calcular estadísticas
-    const totalTransactions = transactions.length;
-    const successfulTransactions = transactions.filter(t => t.status === 'SUCCEEDED').length;
-    const failedTransactions = transactions.filter(t => t.status === 'FAILED').length;
-    const totalAmount = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-    const totalRefunded = transactions.reduce((sum, t) => sum + (t.refunded_amount || 0), 0);
-    const averageTicket = totalAmount > 0 ? totalAmount / successfulTransactions : 0;
-
-    // Estadísticas por método de pago
-    const byPaymentMethod: Record<string, { count: number; amount: number }> = {
-      CARD: { count: 0, amount: 0 },
-      BIZUM: { count: 0, amount: 0 },
-      SEPA_DEBIT: { count: 0, amount: 0 },
-      PAYPAL: { count: 0, amount: 0 },
-    };
-
-    transactions.forEach(t => {
-      if (t.status === 'SUCCEEDED') {
-        const method = t.payment_method || 'CARD';
-        if (byPaymentMethod[method]) {
-          byPaymentMethod[method].count++;
-          byPaymentMethod[method].amount += t.amount || 0;
-        }
-      }
-    });
-
-    return {
-      totalTransactions,
-      successfulTransactions,
-      failedTransactions,
-      totalAmount,
-      totalRefunded,
-      averageTicket,
-      byPaymentMethod: byPaymentMethod as Record<string, { count: number; amount: number }>,
-    };
-  } catch (error) {
-    console.error('Error al calcular estadísticas:', error);
-    return getEmptyPaymentStats();
   }
 }
 
@@ -621,26 +112,35 @@ function getEmptyPaymentStats(): PaymentStats {
 }
 
 // ============================================
-// OBTENER HISTORIAL DE TRANSACCIONES
+// OBTENER FACTURAS
 // ============================================
 
-export async function getPaymentHistory(
-  filters?: {
-    status?: string;
-    paymentMethod?: string;
-    referenceType?: string;
-    startDate?: string;
-    endDate?: string;
-  },
+export interface GetInvoicesFilters {
+  status?: string;
+  patientId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export async function getInvoices(
+  filters?: GetInvoicesFilters,
   limit: number = 50,
   offset: number = 0
-): Promise<{ transactions: PaymentTransaction[]; total: number }> {
+): Promise<{ invoices: Invoice[]; total: number }> {
   const adminSupabase = createAdminClient();
 
   try {
     let query = adminSupabase
-      .from('payment_transactions')
-      .select('*', { count: 'exact' })
+      .from('invoices')
+      .select(`
+        *,
+        patients!inner(
+          id,
+          first_name,
+          last_name,
+          medical_record_number
+        )
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -648,12 +148,8 @@ export async function getPaymentHistory(
       query = query.eq('status', filters.status);
     }
 
-    if (filters?.paymentMethod) {
-      query = query.eq('payment_method', filters.paymentMethod);
-    }
-
-    if (filters?.referenceType) {
-      query = query.eq('reference_type', filters.referenceType);
+    if (filters?.patientId) {
+      query = query.eq('patient_id', filters.patientId);
     }
 
     if (filters?.startDate) {
@@ -667,194 +163,587 @@ export async function getPaymentHistory(
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('Error al obtener historial:', error);
-      return { transactions: [], total: 0 };
+      console.error('Error al obtener facturas:', error);
+      return { invoices: [], total: 0 };
     }
 
     return {
-      transactions: (data || []) as PaymentTransaction[],
+      invoices: (data || []) as Invoice[],
       total: count || 0,
     };
   } catch (error) {
-    console.error('Error al obtener historial de pagos:', error);
-    return { transactions: [], total: 0 };
+    console.error('Error al obtener facturas:', error);
+    return { invoices: [], total: 0 };
+  }
+}
+
+export async function getInvoiceById(invoiceId: string): Promise<Invoice | null> {
+  const adminSupabase = createAdminClient();
+
+  try {
+    const { data, error } = await adminSupabase
+      .from('invoices')
+      .select(`
+        *,
+        patients!inner(
+          id,
+          first_name,
+          last_name,
+          medical_record_number,
+          email,
+          phone
+        )
+      `)
+      .eq('id', invoiceId)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data as Invoice;
+  } catch (error) {
+    console.error('Error al obtener factura:', error);
+    return null;
   }
 }
 
 // ============================================
-// PROCESAR WEBHOOK DE STRIPE
+// CREAR INTENCIÓN DE PAGO (STRIPE)
 // ============================================
 
-export interface ProcessWebhookResult {
+export interface CreatePaymentIntentDTO {
+  amount: number;
+  currency?: string;
+  paymentMethod?: string;
+  description?: string;
+  customerEmail?: string;
+  customerName?: string;
+  customerPhone?: string;
+  referenceType: 'INVOICE' | 'LAB_ORDER';
+  referenceId: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreatePaymentIntentResult {
   success: boolean;
-  eventId?: string;
+  clientSecret?: string;
+  transactionId?: string;
+  providerPaymentIntentId?: string;
   error?: string;
 }
 
-/**
- * Procesa un evento de webhook recibido de Stripe
- */
-export async function processStripeWebhook(
-  eventId: string,
-  eventType: string,
-  payload: Record<string, unknown>
-): Promise<ProcessWebhookResult> {
+export async function createPaymentIntent(
+  paymentData: CreatePaymentIntentDTO
+): Promise<CreatePaymentIntentResult> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    if (paymentData.amount <= 0) {
+      return { success: false, error: 'El monto debe ser mayor a 0' };
+    }
+
+    const paymentReference = generatePaymentReference();
+
+    // Simular PaymentIntent de Stripe
+    const mockPaymentIntent: StripePaymentIntent = {
+      id: `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      client_secret: `pi_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`,
+      status: 'requires_payment_method',
+      amount: paymentData.amount,
+      currency: paymentData.currency || 'eur',
+    };
+
+    // Actualizar la factura con referencia de pago pendiente
+    if (paymentData.referenceType === 'INVOICE') {
+      await adminSupabase
+        .from('invoices')
+        .update({
+          payment_reference: mockPaymentIntent.id,
+          payment_method: 'STRIPE_PENDING',
+        })
+        .eq('id', paymentData.referenceId);
+    }
+
+    // Para órdenes de laboratorio
+    if (paymentData.referenceType === 'LAB_ORDER') {
+      await adminSupabase
+        .from('lab_orders')
+        .update({
+          payment_status: 'processing',
+        })
+        .eq('id', paymentData.referenceId);
+    }
+
+    revalidatePath('/dashboard/billing');
+    revalidatePath('/dashboard/lab/orders');
+
+    return {
+      success: true,
+      clientSecret: mockPaymentIntent.client_secret,
+      transactionId: paymentReference,
+      providerPaymentIntentId: mockPaymentIntent.id,
+    };
+  } catch (error) {
+    console.error('Error al crear intención de pago:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al crear la intención de pago' 
+    };
+  }
+}
+
+// ============================================
+// CONFIRMAR PAGO DE FACTURA
+// ============================================
+
+export interface ConfirmInvoicePaymentResult {
+  success: boolean;
+  invoice?: Invoice;
+  error?: string;
+}
+
+export async function confirmInvoicePayment(
+  invoiceId: string,
+  paymentMethod: string,
+  providerTransactionId?: string
+): Promise<ConfirmInvoicePaymentResult> {
   const adminSupabase = createAdminClient();
 
   try {
-    // Verificar si el evento ya fue procesado
-    const { data: existingEvent } = await adminSupabase
-      .from('payment_webhook_events')
-      .select('id')
-      .eq('stripe_event_id', eventId)
+    // Obtener la factura
+    const { data: invoice, error: invoiceError } = await adminSupabase
+      .from('invoices')
+      .select('*')
+      .eq('id', invoiceId)
       .single();
 
-    if (existingEvent) {
-      return { success: true, eventId, error: 'Evento ya procesado' };
+    if (invoiceError || !invoice) {
+      return { success: false, error: 'Factura no encontrada' };
     }
 
-    // Registrar el evento
-    const { data: webhookEvent, error: webhookError } = await adminSupabase
-      .from('payment_webhook_events')
+    // Actualizar la factura como pagada
+    const { data: updatedInvoice, error: updateError } = await adminSupabase
+      .from('invoices')
+      .update({
+        status: 'paid',
+        amount_paid: invoice.total_amount,
+        payment_method: paymentMethod,
+        payment_reference: providerTransactionId || invoice.payment_reference,
+        paid_date: new Date().toISOString().split('T')[0],
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invoiceId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error al confirmar pago:', updateError);
+      return { success: false, error: 'Error al actualizar la factura' };
+    }
+
+    revalidatePath('/dashboard/billing');
+    revalidatePath(`/dashboard/billing/${invoiceId}`);
+
+    return {
+      success: true,
+      invoice: updatedInvoice as Invoice,
+    };
+  } catch (error) {
+    console.error('Error al confirmar pago de factura:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al confirmar el pago' 
+    };
+  }
+}
+
+// ============================================
+// PROCESAR PAGO MANUAL (EFECTIVO, TARJETA, TRANSFERENCIA)
+// ============================================
+
+export interface ProcessManualPaymentDTO {
+  invoiceId: string;
+  paymentMethod: 'CASH' | 'CARD' | 'TRANSFER';
+  amount: number;
+  reference?: string;
+  notes?: string;
+}
+
+export interface ProcessManualPaymentResult {
+  success: boolean;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  error?: string;
+}
+
+export async function processManualPayment(
+  paymentData: ProcessManualPaymentDTO
+): Promise<ProcessManualPaymentResult> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Obtener la factura
+    const { data: invoice, error: invoiceError } = await adminSupabase
+      .from('invoices')
+      .select('*')
+      .eq('id', paymentData.invoiceId)
+      .single();
+
+    if (invoiceError || !invoice) {
+      return { success: false, error: 'Factura no encontrada' };
+    }
+
+    if (invoice.status === 'paid') {
+      return { success: false, error: 'Esta factura ya está pagada' };
+    }
+
+    // Validar el monto
+    const pendingAmount = Number(invoice.total_amount) - Number(invoice.amount_paid || 0);
+    if (paymentData.amount <= 0) {
+      return { success: false, error: 'El monto debe ser mayor a 0' };
+    }
+
+    if (paymentData.amount > pendingAmount) {
+      return { success: false, error: `El monto excede el pendiente de ${pendingAmount.toFixed(2)}` };
+    }
+
+    // Generar referencia de pago
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const paymentReference = `PAY-${today}-${random}`;
+
+    // Calcular nuevo monto pagado
+    const newAmountPaid = Number(invoice.amount_paid || 0) + paymentData.amount;
+    const newStatus = newAmountPaid >= Number(invoice.total_amount) ? 'paid' : 'pending';
+
+    // Actualizar la factura directamente (sin tabla payment_transactions)
+    const { error: updateError } = await adminSupabase
+      .from('invoices')
+      .update({
+        status: newStatus,
+        amount_paid: newAmountPaid,
+        payment_method: paymentData.paymentMethod,
+        payment_reference: paymentReference,
+        paid_date: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invoice.id);
+
+    if (updateError) {
+      console.error('Error al actualizar factura:', updateError);
+      return { success: false, error: 'Error al procesar el pago' };
+    }
+
+    revalidatePath('/dashboard/billing');
+    revalidatePath(`/dashboard/billing/${invoice.id}`);
+
+    return {
+      success: true,
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoice_number,
+    };
+  } catch (error) {
+    console.error('Error al procesar pago manual:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al procesar el pago' 
+    };
+  }
+}
+
+// ============================================
+// PROCESAR PAGO DE ÓRDEN DE LABORATORIO
+// ============================================
+
+export interface ProcessLabOrderPaymentDTO {
+  orderId: string;
+  paymentMethod: 'CASH' | 'CARD' | 'TRANSFER';
+  amount: number;
+  reference?: string;
+  notes?: string;
+}
+
+export async function processLabOrderPayment(
+  paymentData: ProcessLabOrderPaymentDTO
+): Promise<ProcessManualPaymentResult> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Obtener la orden de laboratorio
+    const { data: order, error: orderError } = await adminSupabase
+      .from('lab_orders')
+      .select('*')
+      .eq('id', paymentData.orderId)
+      .single();
+
+    if (orderError || !order) {
+      return { success: false, error: 'Orden de laboratorio no encontrada' };
+    }
+
+    if (order.payment_status === 'paid') {
+      return { success: false, error: 'Esta orden ya está pagada' };
+    }
+
+    // Validar el monto
+    if (paymentData.amount <= 0) {
+      return { success: false, error: 'El monto debe ser mayor a 0' };
+    }
+
+    // Generar referencia de pago
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const paymentReference = `PAY-${today}-${random}`;
+
+    // Actualizar la orden como pagada
+    const { error: updateOrderError } = await adminSupabase
+      .from('lab_orders')
+      .update({
+        payment_status: 'paid',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id);
+
+    if (updateOrderError) {
+      console.error('Error al actualizar orden:', updateOrderError);
+      return { success: false, error: 'Error al procesar el pago' };
+    }
+
+    revalidatePath('/dashboard/lab/orders');
+    revalidatePath(`/dashboard/lab/orders/${order.id}`);
+
+    return {
+      success: true,
+      invoiceId: order.id,
+      invoiceNumber: order.order_number,
+    };
+  } catch (error) {
+    console.error('Error al procesar pago de orden:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al procesar el pago' 
+    };
+  }
+}
+
+// ============================================
+// OBTENER ESTADÍSTICAS DE FACTURACIÓN
+// ============================================
+
+export async function getPaymentStats(
+  startDate?: string,
+  endDate?: string
+): Promise<PaymentStats> {
+  const adminSupabase = createAdminClient();
+
+  try {
+    let query = adminSupabase
+      .from('invoices')
+      .select('status, payment_method, total_amount, amount_paid, created_at');
+
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+
+    if (endDate) {
+      query = query.lte('created_at', endDate);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error al obtener estadísticas:', error);
+      return getEmptyPaymentStats();
+    }
+
+    const invoices = data || [];
+    
+    // Calcular estadísticas basadas en facturas
+    const totalInvoices = invoices.length;
+    const paidInvoices = invoices.filter(i => i.status === 'paid').length;
+    const pendingInvoices = invoices.filter(i => i.status === 'pending').length;
+    const totalAmount = invoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+    const totalPaid = invoices.reduce((sum, i) => sum + (Number(i.amount_paid) || 0), 0);
+    const averageTicket = totalInvoices > 0 ? totalAmount / totalInvoices : 0;
+
+    // Estadísticas por método de pago
+    const byPaymentMethod: Record<string, { count: number; amount: number }> = {
+      CASH: { count: 0, amount: 0 },
+      CARD: { count: 0, amount: 0 },
+      TRANSFER: { count: 0, amount: 0 },
+      STRIPE: { count: 0, amount: 0 },
+      BIZUM: { count: 0, amount: 0 },
+      STRIPE_PENDING: { count: 0, amount: 0 },
+    };
+
+    invoices.forEach(invoice => {
+      if (invoice.status === 'paid') {
+        const method = invoice.payment_method || 'CASH';
+        if (byPaymentMethod[method]) {
+          byPaymentMethod[method].count++;
+          byPaymentMethod[method].amount += Number(invoice.amount_paid) || 0;
+        }
+      }
+    });
+
+    return {
+      totalTransactions: totalInvoices,
+      successfulTransactions: paidInvoices,
+      failedTransactions: pendingInvoices,
+      totalAmount,
+      totalRefunded: 0, // No hay reembolsos en el esquema actual
+      averageTicket,
+      byPaymentMethod: byPaymentMethod as Record<string, { count: number; amount: number }>,
+    };
+  } catch (error) {
+    console.error('Error al calcular estadísticas:', error);
+    return getEmptyPaymentStats();
+  }
+}
+
+// ============================================
+// CREAR NUEVA FACTURA
+// ============================================
+
+export interface CreateInvoiceDTO {
+  patientId: string;
+  appointmentId?: string;
+  items: Array<{
+    description: string;
+    service_code?: string;
+    quantity: number;
+    unit_price: number;
+  }>;
+  taxRate?: number;
+  discountAmount?: number;
+  dueDate: string;
+  notes?: string;
+}
+
+export interface CreateInvoiceResult {
+  success: boolean;
+  invoice?: Invoice;
+  error?: string;
+}
+
+export async function createInvoice(invoiceData: CreateInvoiceDTO): Promise<CreateInvoiceResult> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Generar número de factura
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const invoiceNumber = `INV-${today}-${random}`;
+
+    // Calcular totales
+    const subtotal = invoiceData.items.reduce(
+      (sum, item) => sum + (item.quantity * item.unit_price),
+      0
+    );
+    const taxAmount = invoiceData.taxRate ? subtotal * (invoiceData.taxRate / 100) : 0;
+    const discountAmount = invoiceData.discountAmount || 0;
+    const totalAmount = subtotal + taxAmount - discountAmount;
+
+    // Preparar items como JSONB
+    const items = invoiceData.items.map(item => ({
+      description: item.description,
+      service_code: item.service_code || null,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total: item.quantity * item.unit_price,
+    }));
+
+    // Insertar factura
+    const { data: invoice, error: insertError } = await adminSupabase
+      .from('invoices')
       .insert({
-        stripe_event_id: eventId,
-        event_type: eventType,
-        payload: payload,
+        invoice_number: invoiceNumber,
+        patient_id: invoiceData.patientId,
+        appointment_id: invoiceData.appointmentId || null,
+        subtotal,
+        tax_amount: taxAmount,
+        discount_amount: discountAmount,
+        total_amount: totalAmount,
+        amount_paid: 0,
+        items,
+        due_date: invoiceData.dueDate,
+        notes: invoiceData.notes || null,
+        status: 'pending',
       })
       .select()
       .single();
 
-    if (webhookError) {
-      console.error('Error al registrar webhook:', webhookError);
-      return { success: false, error: 'Error al registrar el evento' };
+    if (insertError) {
+      console.error('Error al crear factura:', insertError);
+      return { success: false, error: 'Error al crear la factura' };
     }
 
-    // Procesar según el tipo de evento
-    let result: { success: boolean; error?: string } = { success: true };
+    revalidatePath('/dashboard/billing');
 
-    // Definir tipo para eventos de Stripe
-    interface StripeEventPayload {
-      data?: {
-        object?: Record<string, unknown>;
-        charges?: {
-          data?: Array<{ id: string }>;
-        };
-      };
-    }
-
-    const stripePayload = payload as StripeEventPayload;
-
-    switch (eventType) {
-      case 'payment_intent.succeeded':
-        const paymentIntent = stripePayload.data?.object;
-        const piId = paymentIntent?.id as string | undefined;
-        if (piId) {
-          result = await confirmPayment(piId, 'SUCCEEDED', {
-            providerTransactionId: stripePayload.data?.charges?.data?.[0]?.id as string | undefined,
-          });
-        }
-        break;
-
-      case 'payment_intent.payment_failed':
-        const failedPaymentIntent = stripePayload.data?.object;
-        const failedPiId = failedPaymentIntent?.id as string | undefined;
-        if (failedPiId) {
-          result = await confirmPayment(failedPiId, 'FAILED');
-        }
-        break;
-
-      case 'charge.refunded':
-        // Manejar reembolsos desde Stripe
-        const charge = stripePayload.data?.object;
-        const paymentIntentId = charge?.payment_intent as string | undefined;
-        if (paymentIntentId) {
-          await confirmPayment(paymentIntentId, 'SUCCEEDED'); // Actualizar monto reembolsado
-        }
-        break;
-
-      case 'payment_intent.processing':
-        const processingPaymentIntent = stripePayload.data?.object;
-        const processingPiId = processingPaymentIntent?.id as string | undefined;
-        if (processingPiId) {
-          result = await confirmPayment(processingPiId, 'PROCESSING');
-        }
-        break;
-
-      default:
-        console.log(`Evento de Stripe no manejado: ${eventType}`);
-    }
-
-    // Actualizar estado del evento de webhook
-    await adminSupabase
-      .from('payment_webhook_events')
-      .update({
-        processed: result.success,
-        processed_at: new Date().toISOString(),
-        error_message: result.error,
-      })
-      .eq('id', webhookEvent.id);
-
-    return { success: result.success, eventId };
+    return {
+      success: true,
+      invoice: invoice as Invoice,
+    };
   } catch (error) {
-    console.error('Error al procesar webhook:', error);
+    console.error('Error al crear factura:', error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Error al procesar el webhook' 
+      error: error instanceof Error ? error.message : 'Error al crear la factura' 
     };
   }
 }
 
 // ============================================
-// CANCELAR PAGO PENDIENTE
+// CANCELAR FACTURA
 // ============================================
 
-export async function cancelPendingPayment(
-  transactionId: string
+export async function cancelInvoice(
+  invoiceId: string
 ): Promise<{ success: boolean; error?: string }> {
   const adminSupabase = createAdminClient();
 
   try {
-    const { data: transaction, error: findError } = await adminSupabase
-      .from('payment_transactions')
-      .select('*')
-      .eq('id', transactionId)
-      .single();
-
-    if (findError || !transaction) {
-      return { success: false, error: 'Transacción no encontrada' };
-    }
-
-    if (transaction.status !== 'PENDING') {
-      return { success: false, error: 'Solo se pueden cancelar pagos pendientes' };
-    }
-
-    // Cancelar en Stripe si existe PaymentIntent
-    if (transaction.provider_payment_intent_id) {
-      /*
-      await stripe.paymentIntents.cancel(transaction.provider_payment_intent_id);
-      */
-    }
-
-    // Actualizar estado
     const { error: updateError } = await adminSupabase
-      .from('payment_transactions')
+      .from('invoices')
       .update({
-        status: 'CANCELLED',
+        status: 'cancelled',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', transactionId);
+      .eq('id', invoiceId);
 
     if (updateError) {
       return { success: false, error: updateError.message };
     }
 
     revalidatePath('/dashboard/billing');
+    revalidatePath(`/dashboard/billing/${invoiceId}`);
+
     return { success: true };
   } catch (error) {
-    console.error('Error al cancelar pago:', error);
+    console.error('Error al cancelar factura:', error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Error al cancelar el pago' 
+      error: error instanceof Error ? error.message : 'Error al cancelar la factura' 
     };
   }
 }

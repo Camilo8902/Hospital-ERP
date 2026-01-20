@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPaymentTransaction, cancelPendingPayment } from '@/lib/actions/payments';
+import { getInvoiceById, cancelInvoice } from '@/lib/actions/payments';
 import { getCurrentUser, getCurrentProfile } from '@/lib/supabase/server';
-import type { PaymentStatusResponse } from '@/lib/types';
 
 // ============================================
 // GET /api/payments/transactions/[id]
-// Obtiene una transacción por ID
+// Obtiene una factura por ID (antes: transacción de pago)
 // ============================================
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-): Promise<NextResponse<PaymentStatusResponse>> {
+): Promise<NextResponse<{ success: boolean; invoice?: unknown; error?: string }>> {
   try {
     // Verificar autenticación
     const user = await getCurrentUser();
@@ -26,26 +25,26 @@ export async function GET(
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'ID de transacción requerido' },
+        { success: false, error: 'ID de factura requerido' },
         { status: 400 }
       );
     }
 
-    const transaction = await getPaymentTransaction(id);
+    const invoice = await getInvoiceById(id);
 
-    if (!transaction) {
+    if (!invoice) {
       return NextResponse.json(
-        { success: false, error: 'Transacción no encontrada' },
+        { success: false, error: 'Factura no encontrada' },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      transaction,
+      invoice,
     });
   } catch (error) {
-    console.error('Error al obtener transacción:', error);
+    console.error('Error al obtener factura:', error);
     return NextResponse.json(
       { success: false, error: 'Error interno del servidor' },
       { status: 500 }
@@ -55,7 +54,7 @@ export async function GET(
 
 // ============================================
 // DELETE /api/payments/transactions/[id]
-// Cancela una transacción pendiente
+// Cancela una factura (antes: transacción pendiente)
 // ============================================
 
 export async function DELETE(
@@ -72,16 +71,25 @@ export async function DELETE(
       );
     }
 
+    // Verificar permisos de administrador
+    const profile = await getCurrentProfile();
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Solo administradores pueden cancelar facturas' },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'ID de transacción requerido' },
+        { success: false, error: 'ID de factura requerido' },
         { status: 400 }
       );
     }
 
-    const result = await cancelPendingPayment(id);
+    const result = await cancelInvoice(id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -92,7 +100,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error al cancelar transacción:', error);
+    console.error('Error al cancelar factura:', error);
     return NextResponse.json(
       { success: false, error: 'Error interno del servidor' },
       { status: 500 }

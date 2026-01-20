@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPaymentHistory } from '@/lib/actions/payments';
+import { getInvoices } from '@/lib/actions/payments';
 import { getCurrentUser, getCurrentProfile } from '@/lib/supabase/server';
-import type { PaymentTransaction } from '@/lib/types';
 
 // ============================================
 // GET /api/payments/history
-// Obtiene el historial de transacciones con filtros
+// Obtiene el historial de facturas con filtros
 // ============================================
 
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<{ 
   success: boolean; 
-  transactions?: PaymentTransaction[]; 
+  invoices?: unknown[]; 
   total?: number;
   error?: string;
 }>> {
@@ -30,7 +29,7 @@ export async function GET(
     const profile = await getCurrentProfile();
     if (!profile || (profile.role !== 'admin' && profile.role !== 'billing' && profile.role !== 'reception')) {
       return NextResponse.json(
-        { success: false, error: 'No tiene permisos para ver el historial' },
+        { success: false, error: 'No tiene permisos para ver facturas' },
         { status: 403 }
       );
     }
@@ -38,8 +37,7 @@ export async function GET(
     // Obtener parámetros de query
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') || undefined;
-    const paymentMethod = searchParams.get('paymentMethod') || undefined;
-    const referenceType = searchParams.get('referenceType') || undefined;
+    const patientId = searchParams.get('patientId') || undefined;
     const startDate = searchParams.get('startDate') || undefined;
     const endDate = searchParams.get('endDate') || undefined;
     const limit = parseInt(searchParams.get('limit') || '50', 10);
@@ -53,20 +51,20 @@ export async function GET(
       );
     }
 
-    // Obtener historial
-    const result = await getPaymentHistory(
-      { status, paymentMethod, referenceType, startDate, endDate },
+    // Obtener facturas
+    const result = await getInvoices(
+      { status, patientId, startDate, endDate },
       limit,
       offset
     );
 
     return NextResponse.json({
       success: true,
-      transactions: result.transactions,
+      invoices: result.invoices,
       total: result.total,
     });
   } catch (error) {
-    console.error('Error al obtener historial:', error);
+    console.error('Error al obtener facturas:', error);
     return NextResponse.json(
       { success: false, error: 'Error interno del servidor' },
       { status: 500 }

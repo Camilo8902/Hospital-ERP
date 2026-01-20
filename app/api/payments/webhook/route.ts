@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processStripeWebhook } from '@/lib/actions/payments';
+import { confirmInvoicePayment } from '@/lib/actions/payments';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
 
 // ============================================
 // POST /api/payments/webhook
-// Recibe y procesa eventos de Stripe
+// Recibe y procesa eventos de Stripe para confirmar pagos de facturas
 // ============================================
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -20,7 +20,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Verificar firma del webhook (solo en producción)
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     
-    // En desarrollo,，我们可以接受 webhooks sin firma verificada
     const isDevelopment = process.env.NODE_ENV === 'development' || !webhookSecret;
 
     let eventId: string | null = null;
@@ -34,7 +33,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           .update(JSON.stringify(body))
           .digest('hex');
 
-        // Stripe proporciona la firma en formato: t=timestamp,v1=signature
         const elements = signature.split(',');
         const timestamp = elements.find(e => e.startsWith('t='))?.slice(2);
         const v1Signature = elements.find(e => e.startsWith('v1='))?.slice(4);
@@ -56,7 +54,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
       } catch (sigError) {
         console.error('Error al verificar firma:', sigError);
-        // Continuar en desarrollo
       }
     }
 
@@ -73,15 +70,36 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`Recibido webhook de Stripe: ${eventType} (${eventId})`);
 
-    // Procesar el evento
-    const result = await processStripeWebhook(eventId, eventType, body);
+    // Procesar según el tipo de evento
+    interface StripeEventData {
+      object?: {
+        id?: string;
+        metadata?: Record<string, string>;
+        charges?: {
+          data?: Array<{ id: string }>;
+        };
+      };
+    }
 
-    if (!result.success) {
-      console.error(`Error procesando webhook ${eventId}:`, result.error);
-      return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
-      );
+    const stripePayload = body as StripeEventData & { type: string };
+
+    // Solo procesar eventos de pago exitoso
+    if (eventType === 'payment_intent.succeeded') {
+      const paymentIntent = stripePayload.object;
+      const invoiceId = paymentIntent?.metadata?.invoice_id;
+      const providerTransactionId = paymentIntent?.charges?.data?.[0]?.id || paymentIntent?.id;
+
+      if (invoiceId) {
+        const result = await confirmInvoicePayment(
+          invoiceId,
+          'STRIPE',
+          providerTransactionId
+        );
+
+        if (!result.success) {
+          console.error(`Error confirmando pago de factura ${invoiceId}:`, result.error);
+        }
+      }
     }
 
     return NextResponse.json({ received: true });
