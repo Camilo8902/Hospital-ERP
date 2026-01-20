@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getInvoiceById, cancelInvoice } from '@/lib/actions/payments';
-import { ArrowLeft, Printer, Edit, Trash2, XCircle, CheckCircle, Clock, AlertCircle, FileText, Calculator } from 'lucide-react';
+import { ArrowLeft, Printer, Edit, Trash2, XCircle, CheckCircle, Clock, AlertCircle, FileText, Calculator, MoreVertical, DollarSign, CreditCard } from 'lucide-react';
 import type { Invoice, InvoiceItem } from '@/lib/types';
 
 export default function InvoiceDetailsPage() {
@@ -17,6 +17,7 @@ export default function InvoiceDetailsPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showMobileOptions, setShowMobileOptions] = useState(false);
 
   useEffect(() => {
     if (invoiceId) {
@@ -47,7 +48,6 @@ export default function InvoiceDetailsPage() {
     try {
       const result = await cancelInvoice(invoice.id);
       if (result.success) {
-        // Update local state
         setInvoice({ ...invoice, status: 'cancelled' });
         setShowCancelModal(false);
       } else {
@@ -130,7 +130,7 @@ export default function InvoiceDetailsPage() {
   }
 
   const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  const taxAmount = invoice.tax_amount ? subtotal * (invoice.tax_amount / invoice.subtotal || 0) : 0;
+  const taxAmount = invoice.tax_amount || 0;
   const total = subtotal + taxAmount - (invoice.discount_amount || 0);
 
   return (
@@ -146,12 +146,14 @@ export default function InvoiceDetailsPage() {
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </button>
-              <div>
+              <div className="lg:block hidden">
                 <h1 className="text-xl font-bold text-gray-900">Factura #{invoice.invoice_number}</h1>
                 <p className="text-sm text-gray-500">Detalles de la factura</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            
+            {/* Desktop Actions */}
+            <div className="hidden lg:flex items-center gap-2">
               {invoice.status === 'pending' && (
                 <button
                   onClick={() => setShowCancelModal(true)}
@@ -173,6 +175,51 @@ export default function InvoiceDetailsPage() {
                 Imprimir
               </button>
             </div>
+
+            {/* Mobile Actions Toggle */}
+            <button
+              onClick={() => setShowMobileOptions(!showMobileOptions)}
+              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <MoreVertical className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+
+          {/* Mobile Title & Options */}
+          <div className="lg:hidden mt-2">
+            <h1 className="text-lg font-bold text-gray-900">Factura #{invoice.invoice_number}</h1>
+            
+            {/* Mobile Actions Panel */}
+            {showMobileOptions && (
+              <div className="mt-3 pt-3 border-t space-y-2">
+                {invoice.status === 'pending' && (
+                  <button
+                    onClick={() => {
+                      setShowCancelModal(true);
+                      setShowMobileOptions(false);
+                    }}
+                    className="w-full btn-secondary btn-md flex items-center justify-center gap-2 text-red-600"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Cancelar Factura
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    router.push(`/dashboard/billing/${invoice.id}/edit`);
+                    setShowMobileOptions(false);
+                  }}
+                  className="w-full btn-secondary btn-md flex items-center justify-center gap-2"
+                >
+                  <Edit className="w-4 h-4" />
+                  Editar
+                </button>
+                <button className="w-full btn-primary btn-md flex items-center justify-center gap-2">
+                  <Printer className="w-4 h-4" />
+                  Imprimir
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -236,7 +283,9 @@ export default function InvoiceDetailsPage() {
               <Calculator className="w-5 h-5 text-gray-400" />
               Items de la Factura
             </h2>
-            <div className="overflow-x-auto">
+            
+            {/* Desktop Table */}
+            <div className="hidden md:overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
@@ -270,17 +319,41 @@ export default function InvoiceDetailsPage() {
               </table>
             </div>
 
+            {/* Mobile Card List */}
+            <div className="md:hidden space-y-3">
+              {invoice.items.map((item, index) => (
+                <div key={index} className="bg-gray-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium text-gray-900">{item.description}</p>
+                    <p className="font-bold text-gray-900">
+                      {formatCurrency(item.quantity * item.unit_price)}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <span>Cant. x {formatCurrency(item.unit_price)}</span>
+                    {item.source_type && (
+                      <span className="badge badge-gray text-xs">
+                        {item.source_type === 'lab_order' ? 'Laboratorio' : 
+                         item.source_type === 'inventory' ? 'Inventario' : 
+                         item.source_type === 'prescription' ? 'Receta' : 'Manual'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* Totals */}
             <div className="mt-6 border-t pt-4">
               <div className="flex justify-end">
-                <div className="w-64 space-y-2">
+                <div className="w-full sm:w-64 space-y-2">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
                     <span>{formatCurrency(subtotal)}</span>
                   </div>
-                  {invoice.tax_amount && invoice.tax_amount > 0 && (
+                  {taxAmount > 0 && (
                     <div className="flex justify-between text-gray-600">
-                      <span>IVA ({invoice.subtotal > 0 ? Math.round((invoice.tax_amount / invoice.subtotal) * 100) : 0}%)</span>
+                      <span>IVA ({invoice.subtotal > 0 ? Math.round((taxAmount / subtotal) * 100) : 0}%)</span>
                       <span>{formatCurrency(taxAmount)}</span>
                     </div>
                   )}

@@ -274,6 +274,63 @@ export async function cancelInvoice(invoiceId: string): Promise<{ success: boole
   }
 }
 
+export async function deleteInvoice(invoiceId: string): Promise<{ success: boolean; error?: string }> {
+  const adminSupabase = createAdminClient();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { success: false, error: 'Usuario no autenticado' };
+  }
+
+  try {
+    // Verificar que la factura existe
+    const { data: invoice, error: invoiceError } = await adminSupabase
+      .from('invoices')
+      .select('id, status')
+      .eq('id', invoiceId)
+      .single();
+
+    if (invoiceError || !invoice) {
+      return { success: false, error: 'Factura no encontrada' };
+    }
+
+    // Solo permitir eliminar facturas canceladas o en borrador
+    if (invoice.status !== 'cancelled' && invoice.status !== 'draft') {
+      return { success: false, error: 'Solo se pueden eliminar facturas canceladas o en borrador' };
+    }
+
+    // Eliminar los items de la factura primero
+    const { error: itemsError } = await adminSupabase
+      .from('invoice_items')
+      .delete()
+      .eq('invoice_id', invoiceId);
+
+    if (itemsError) {
+      return { success: false, error: itemsError.message };
+    }
+
+    // Eliminar la factura
+    const { error: deleteError } = await adminSupabase
+      .from('invoices')
+      .delete()
+      .eq('id', invoiceId);
+
+    if (deleteError) {
+      return { success: false, error: deleteError.message };
+    }
+
+    revalidatePath('/dashboard/billing');
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error al eliminar factura:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Error al eliminar factura' 
+    };
+  }
+}
+
 // ============================================
 // CREAR INTENCIÓN DE PAGO (STRIPE)
 // ============================================

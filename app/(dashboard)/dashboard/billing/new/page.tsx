@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
 import { createInvoice, getUnbilledItems, UnbilledItem } from '@/lib/actions/payments';
 import { searchPatients, getPatients } from '@/lib/actions/patients';
-import { ArrowLeft, Plus, Trash2, Save, FileText, Calendar, User, DollarSign, Calculator, AlertCircle, CheckCircle, Search, FlaskConical, ShoppingCart, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, FileText, Calendar, User, DollarSign, Calculator, AlertCircle, CheckCircle, Search, FlaskConical, ShoppingCart, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Patient } from '@/lib/types';
 
 interface InvoiceItem {
@@ -28,6 +28,7 @@ export default function NewInvoicePage() {
   
   const [unbilledItems, setUnbilledItems] = useState<UnbilledItem[]>([]);
   const [isLoadingUnbilled, setIsLoadingUnbilled] = useState(false);
+  const [showUnbilledItems, setShowUnbilledItems] = useState(false);
   
   const [items, setItems] = useState<InvoiceItem[]>([
     { description: '', quantity: 1, unit_price: 0 }
@@ -60,7 +61,6 @@ export default function NewInvoicePage() {
     const loadInitialData = async () => {
       setIsLoading(true);
       try {
-        // Load all patients for the dropdown
         const patients = await getPatients();
         setAllPatients(patients);
       } catch (err) {
@@ -74,9 +74,9 @@ export default function NewInvoicePage() {
 
     // Set default due date to 30 days from now
     const today = new Date();
-    const dueDate = new Date(today);
-    dueDate.setDate(dueDate.getDate() + 30);
-    setDueDate(dueDate.toISOString().split('T')[0]);
+    const dueDateDefault = new Date(today);
+    dueDateDefault.setDate(dueDateDefault.getDate() + 30);
+    setDueDate(dueDateDefault.toISOString().split('T')[0]);
   }, []);
 
   // Fetch patients for search using server action
@@ -171,11 +171,6 @@ export default function NewInvoicePage() {
     }]);
     // Remove from unbilled items
     setUnbilledItems(unbilledItems.filter(i => i.id !== item.id));
-  };
-
-  // Add manual item
-  const addManualItem = () => {
-    setItems([...items, { description: '', quantity: 1, unit_price: 0 }]);
   };
 
   // Handle submit
@@ -372,59 +367,76 @@ export default function NewInvoicePage() {
         {selectedPatient && unbilledItems.length > 0 && (
           <div className="card border-blue-200 bg-blue-50">
             <div className="card-body">
-              <div className="flex items-center gap-2 mb-4">
-                <ShoppingCart className="w-5 h-5 text-blue-600" />
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Items Pendientes de Facturar
-                </h2>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Los siguientes servicios están pendientes de facturar para este paciente:
-              </p>
+              <button
+                type="button"
+                onClick={() => setShowUnbilledItems(!showUnbilledItems)}
+                className="w-full flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Items Pendientes de Facturar
+                  </h2>
+                  <span className="badge badge-primary">{unbilledItems.length}</span>
+                </div>
+                {showUnbilledItems ? (
+                  <ChevronUp className="w-5 h-5 text-gray-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                )}
+              </button>
+              
+              {showUnbilledItems && (
+                <>
+                  <p className="text-sm text-gray-600 mt-2 mb-4">
+                    Los siguientes servicios están pendientes de facturar para este paciente:
+                  </p>
 
-              {isLoadingUnbilled ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                  <span className="ml-2 text-gray-500">Cargando items...</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {unbilledItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-200"
-                    >
-                      <div className="flex items-center gap-3">
-                        {item.type === 'lab_order' && (
-                          <FlaskConical className="w-5 h-5 text-purple-500" />
-                        )}
-                        {item.type === 'inventory' && (
-                          <ShoppingCart className="w-5 h-5 text-green-500" />
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-900">{item.description}</p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(item.date).toLocaleDateString()}
-                            {item.details && ` • ${item.details}`}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-gray-900">
-                          {formatCurrency(item.amount)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => addUnbilledItem(item)}
-                          className="btn-primary btn-sm flex items-center gap-1"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Agregar
-                        </button>
-                      </div>
+                  {isLoadingUnbilled ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                      <span className="ml-2 text-gray-500">Cargando items...</span>
                     </div>
-                  ))}
-                </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {unbilledItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between p-3 bg-white rounded-lg border border-blue-200"
+                        >
+                          <div className="flex items-center gap-3">
+                            {item.type === 'lab_order' && (
+                              <FlaskConical className="w-5 h-5 text-purple-500" />
+                            )}
+                            {item.type === 'inventory' && (
+                              <ShoppingCart className="w-5 h-5 text-green-500" />
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-900">{item.description}</p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(item.date).toLocaleDateString()}
+                                {item.details && ` • ${item.details}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-gray-900">
+                              {formatCurrency(item.amount)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addUnbilledItem(item)}
+                              className="btn-primary btn-sm flex items-center gap-1"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Agregar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -433,7 +445,7 @@ export default function NewInvoicePage() {
         {/* Invoice Items */}
         <div className="card">
           <div className="card-body">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-gray-400" />
                 Items de la Factura
@@ -441,100 +453,188 @@ export default function NewInvoicePage() {
               <button
                 type="button"
                 onClick={addItem}
-                className="btn-secondary btn-sm flex items-center gap-1"
+                className="btn-secondary btn-sm flex items-center gap-1 self-start"
               >
                 <Plus className="w-4 h-4" />
                 Agregar Item
               </button>
             </div>
 
-            <div className="space-y-3">
+            {/* Desktop Table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-2 text-sm font-medium text-gray-500">Descripción</th>
+                    <th className="text-center py-3 px-2 text-sm font-medium text-gray-500 w-20">Cant.</th>
+                    <th className="text-right py-3 px-2 text-sm font-medium text-gray-500 w-28">Precio</th>
+                    <th className="text-right py-3 px-2 text-sm font-medium text-gray-500 w-28">Total</th>
+                    <th className="w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, index) => (
+                    <tr key={index} className="border-b last:border-b-0">
+                      <td className="py-3 px-2">
+                        <input
+                          type="text"
+                          value={item.description}
+                          onChange={(e) => updateItem(index, 'description', e.target.value)}
+                          placeholder="Descripción del servicio"
+                          className="input w-full"
+                        />
+                      </td>
+                      <td className="py-3 px-2">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          className="input text-center"
+                          min="0"
+                          step="0.01"
+                        />
+                      </td>
+                      <td className="py-3 px-2">
+                        <input
+                          type="number"
+                          value={item.unit_price}
+                          onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                          className="input text-right"
+                          min="0"
+                          step="0.01"
+                        />
+                      </td>
+                      <td className="py-3 px-2 text-right font-medium text-gray-900">
+                        {formatCurrency(item.quantity * item.unit_price)}
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          disabled={items.length === 1}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card List */}
+            <div className="sm:hidden space-y-4">
               {items.map((item, index) => (
-                <div key={index} className="flex gap-3 items-start">
-                  <div className="flex-1">
+                <div key={index} className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Descripción</label>
                     <input
                       type="text"
                       value={item.description}
                       onChange={(e) => updateItem(index, 'description', e.target.value)}
                       placeholder="Descripción del servicio"
-                      className="input"
+                      className="input w-full"
                     />
                   </div>
-                  <div className="w-20">
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                      placeholder="Cant."
-                      className="input text-center"
-                      min="0"
-                      step="0.01"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Cantidad</label>
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        className="input w-full text-center"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Precio Unitario</label>
+                      <input
+                        type="number"
+                        value={item.unit_price}
+                        onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                        className="input w-full text-right"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
                   </div>
-                  <div className="w-28">
-                    <input
-                      type="number"
-                      value={item.unit_price}
-                      onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                      placeholder="Precio"
-                      className="input text-right"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="w-28 py-2 text-right font-medium text-gray-900">
-                    {formatCurrency(item.quantity * item.unit_price)}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <span className="text-sm text-gray-500">Subtotal</span>
+                    <span className="font-bold text-gray-900">
+                      {formatCurrency(item.quantity * item.unit_price)}
+                    </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeItem(index)}
                     disabled={items.length === 1}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="w-full btn-secondary btn-sm text-red-600 disabled:opacity-50"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Eliminar Item
                   </button>
                 </div>
               ))}
+              
+              <button
+                type="button"
+                onClick={addItem}
+                className="w-full btn-secondary btn-md"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Agregar Item
+              </button>
             </div>
 
             {/* Totals */}
             <div className="mt-6 border-t pt-4">
               <div className="flex justify-end">
-                <div className="w-64 space-y-2">
+                <div className="w-full sm:w-64 space-y-3">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
-                    <span>{formatCurrency(subtotal)}</span>
+                    <span className="font-medium">{formatCurrency(subtotal)}</span>
                   </div>
-                  <div className="flex justify-between items-center text-gray-600">
-                    <span>IVA (%)</span>
-                    <input
-                      type="number"
-                      value={taxRate}
-                      onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-                      className="input w-20 text-right"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                    />
+                  
+                  {/* IVA */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-gray-600">
+                    <span className="text-sm">IVA (%)</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={taxRate}
+                        onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                        className="input w-20 text-center text-sm"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                    </div>
                   </div>
+                  
                   {taxRate > 0 && (
                     <div className="flex justify-between text-gray-600">
                       <span>Impuestos</span>
                       <span>{formatCurrency(taxAmount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center text-gray-600">
-                    <span>Descuento</span>
+                  
+                  {/* Descuento */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-gray-600">
+                    <span className="text-sm">Descuento</span>
                     <input
                       type="number"
                       value={discountAmount}
                       onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
-                      className="input w-28 text-right"
+                      className="input w-28 text-right text-sm"
                       min="0"
                       step="0.01"
                     />
                   </div>
-                  <div className="border-t pt-2 flex justify-between text-lg font-bold">
+                  
+                  <div className="border-t pt-3 flex justify-between text-lg font-bold">
                     <span>Total</span>
                     <span className="text-primary-600">{formatCurrency(totalAmount)}</span>
                   </div>
@@ -547,7 +647,7 @@ export default function NewInvoicePage() {
         {/* Due Date and Notes */}
         <div className="card">
           <div className="card-body">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <label className="label mb-2 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-400" />
@@ -557,7 +657,7 @@ export default function NewInvoicePage() {
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="input"
+                  className="input w-full"
                   required
                 />
               </div>
@@ -567,7 +667,7 @@ export default function NewInvoicePage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Observaciones adicionales..."
-                  className="input resize-none"
+                  className="input resize-none w-full"
                   rows={3}
                 />
               </div>
@@ -578,7 +678,7 @@ export default function NewInvoicePage() {
         {/* Summary Card */}
         <div className="card bg-gray-50">
           <div className="card-body">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-gray-600">
                 <Calculator className="w-5 h-5" />
                 <span className="font-medium">Resumen de Factura</span>
@@ -595,7 +695,7 @@ export default function NewInvoicePage() {
         <button
           onClick={handleSubmit}
           disabled={isSaving}
-          className="btn-primary w-full py-4 text-lg font-semibold md:hidden flex items-center justify-center gap-2"
+          className="btn-primary w-full py-4 text-lg font-semibold md:hidden flex items-center justify-center gap-2 sticky bottom-4 shadow-lg"
         >
           {isSaving ? (
             <>
@@ -605,7 +705,7 @@ export default function NewInvoicePage() {
           ) : (
             <>
               <Save className="w-5 h-5" />
-              Guardar Factura - {formatCurrency(totalAmount)}
+              Guardar - {formatCurrency(totalAmount)}
             </>
           )}
         </button>
