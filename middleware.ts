@@ -20,6 +20,7 @@ const roleRestrictedRoutes: Record<string, string[]> = {
   '/dashboard/users/[id]': ['admin'],
   '/dashboard/settings': ['admin'],
   '/dashboard/lab': ['admin', 'lab', 'lab_admin', 'doctor'],
+  '/dashboard/physiotherapy': ['admin', 'doctor', 'physiotherapist', 'nurse', 'reception'],
 };
 
 export async function middleware(request: NextRequest) {

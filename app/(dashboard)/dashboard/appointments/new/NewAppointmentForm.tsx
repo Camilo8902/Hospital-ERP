@@ -207,6 +207,7 @@ export default function NewAppointmentForm({
     { value: 'imaging', label: 'Imagenología' },
     { value: 'laboratory', label: 'Laboratorio' },
     { value: 'surgery', label: 'Cirugía' },
+    { value: 'physiotherapy', label: 'Fisioterapia' },
   ];
 
   // Filtrar habitaciones por tipo

@@ -14,7 +14,8 @@ import {
   AlertCircle,
   FileText,
   Pill,
-  Eye
+  Eye,
+  Activity
 } from 'lucide-react';
 import { updateAppointmentStatus } from '@/lib/actions/appointments';
 
@@ -34,6 +35,7 @@ interface AppointmentCardProps {
     doctor_specialty?: string | null;
     department_name?: string | null;
     room_number?: string | null;
+    physio_session_id?: string | null;
   };
 }
 
@@ -109,6 +111,7 @@ const typeLabels: Record<string, string> = {
   imaging: 'Imagenología',
   laboratory: 'Laboratorio',
   surgery: 'Cirugía',
+  physiotherapy: 'Fisioterapia',
 };
 
 export default function AppointmentCard({ appointment }: AppointmentCardProps) {
@@ -117,6 +120,7 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
 
   const status = statusConfig[appointment.status] || statusConfig.scheduled;
   const patientName = `${appointment.patient_first_name || ''} ${appointment.patient_last_name || ''}`.trim();
+  const isPhysioAppointment = appointment.appointment_type === 'physiotherapy';
   
   // Formatear fecha y hora en zona horaria local
   const { date: dateStr, time: timeStr } = formatLocalDateTime(appointment.start_time);
@@ -130,23 +134,47 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
     }
   };
 
+  // Determinar la URL de inicio según el tipo de cita
+  const getStartUrl = () => {
+    if (isPhysioAppointment) {
+      return `/dashboard/physiotherapy/sessions/new?appointment_id=${appointment.id}`;
+    }
+    return `/dashboard/consultation/${appointment.id}`;
+  };
+
+  // Determinar la URL de ver historia según el tipo de cita
+  const getViewHistoryUrl = () => {
+    if (isPhysioAppointment) {
+      return `/dashboard/patients/${appointment.patient_id}/history?type=physiotherapy`;
+    }
+    return `/dashboard/consultation/${appointment.id}`;
+  };
+
   return (
     <div className={`card overflow-hidden hover:shadow-lg transition-all duration-300 border ${status.border}`}>
-      {/* Status bar */}
+      {/* Status bar - Diferente para fisioterapia */}
       <div className={`${status.bg} px-4 py-2 flex items-center justify-between`}>
         <div className="flex items-center gap-2">
           <span className={status.color}>{status.icon}</span>
           <span className={`text-sm font-medium ${status.color}`}>{status.label}</span>
         </div>
-        <span className="text-xs text-gray-500 font-medium uppercase">
-          {typeLabels[appointment.appointment_type] || appointment.appointment_type}
-        </span>
+        <div className="flex items-center gap-2">
+          {isPhysioAppointment && (
+            <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+              <Activity className="w-3 h-3" />
+              Fisioterapia
+            </span>
+          )}
+          <span className="text-xs text-gray-500 font-medium uppercase">
+            {typeLabels[appointment.appointment_type] || appointment.appointment_type}
+          </span>
+        </div>
       </div>
 
       <div className="p-4">
         {/* Time and Date - Single row */}
-        <div className="w-full h-11 rounded-lg bg-primary-50 flex items-center justify-center mb-3">
-          <span className="text-base font-semibold text-primary-700">
+        <div className={`w-full h-11 rounded-lg flex items-center justify-center mb-3 ${isPhysioAppointment ? 'bg-purple-50' : 'bg-primary-50'}`}>
+          <span className={`text-base font-semibold ${isPhysioAppointment ? 'text-purple-700' : 'text-primary-700'}`}>
             {timeStr} • {dateStr}
           </span>
         </div>
@@ -163,8 +191,14 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
         <div className="space-y-1.5 mb-4">
           {appointment.doctor_full_name && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Stethoscope className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              <span className="font-medium">Dr. {appointment.doctor_full_name}</span>
+              {isPhysioAppointment ? (
+                <Activity className="w-4 h-4 text-purple-400 flex-shrink-0" />
+              ) : (
+                <Stethoscope className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              )}
+              <span className="font-medium">
+                {isPhysioAppointment ? 'Fis. ' : 'Dr. '}{appointment.doctor_full_name}
+              </span>
               {appointment.doctor_specialty && (
                 <span className="text-gray-400">• {appointment.doctor_specialty}</span>
               )}
@@ -199,50 +233,66 @@ export default function AppointmentCard({ appointment }: AppointmentCardProps) {
               Ver Detalle
             </Link>
 
-            {/* Status-based Action Button */}
+            {/* Status-based Action Button - Diferente para fisioterapia */}
             {appointment.status === 'scheduled' && (
               <button
                 onClick={() => {
                   startTransition(async () => {
                     await updateAppointmentStatus(appointment.id, 'in_progress');
-                    router.push(`/dashboard/consultation/${appointment.id}`);
+                    router.push(getStartUrl());
                   });
                 }}
                 disabled={isPending}
-                className="btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0"
+                className={`btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0 ${isPhysioAppointment ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
               >
-                {isPending ? '...' : <><Play className="w-4 h-4" />Iniciar</>}
+                {isPending ? '...' : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    {isPhysioAppointment ? 'Iniciar Sesión' : 'Iniciar'}
+                  </>
+                )}
               </button>
             )}
 
             {appointment.status === 'in_progress' && (
               <Link
-                href={`/dashboard/consultation/${appointment.id}`}
-                className="btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0"
+                href={getStartUrl()}
+                className={`btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0 ${isPhysioAppointment ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
               >
                 <Play className="w-4 h-4" />
-                Continuar
+                {isPhysioAppointment ? 'Continuar Sesión' : 'Continuar'}
               </Link>
             )}
 
             {appointment.status === 'completed' && (
               <Link
-                href={`/dashboard/consultation/${appointment.id}`}
-                className="btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0"
+                href={getViewHistoryUrl()}
+                className={`btn-primary btn-md sm:btn-sm justify-center flex items-center gap-2 min-h-[44px] sm:min-h-0 ${isPhysioAppointment ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
               >
                 <Eye className="w-4 h-4" />
-                Ver Historia
+                {isPhysioAppointment ? 'Ver Historia' : 'Ver Historia'}
               </Link>
             )}
 
-            {/* Receta Button - Available for in_progress and completed */}
-            {(appointment.status === 'in_progress' || appointment.status === 'completed') && (
+            {/* Receta Button - Available for in_progress and completed - No para fisioterapia */}
+            {(appointment.status === 'in_progress' || appointment.status === 'completed') && !isPhysioAppointment && (
               <Link
                 href={`/dashboard/pharmacy/prescriptions/new?appointment_id=${appointment.id}&patient_id=${appointment.patient_id}`}
                 className="btn-primary btn-md sm:btn-sm flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0"
               >
                 <Pill className="w-4 h-4" />
                 Receta
+              </Link>
+            )}
+
+            {/* Sesión de Fisioterapia Button - Solo para citas de fisioterapia completadas */}
+            {isPhysioAppointment && appointment.status === 'completed' && (
+              <Link
+                href={`/dashboard/physiotherapy/sessions/${appointment.physio_session_id}`}
+                className="btn-primary btn-md sm:btn-sm flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0"
+              >
+                <Activity className="w-4 h-4" />
+                Ver Sesión
               </Link>
             )}
 
