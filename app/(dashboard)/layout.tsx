@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import Sidebar from '@/components/shared/Sidebar';
+import DynamicSidebar from '@/components/shared/DynamicSidebar';
 import Header from '@/components/shared/Header';
 import { MobileMenuProvider } from '@/components/shared/MobileMenuContext';
 
@@ -32,7 +32,7 @@ export default async function DashboardLayout({
   return (
     <MobileMenuProvider>
       <div className="min-h-screen bg-gray-50">
-        <Sidebar userRole={userRole} userName={userName} />
+        <DynamicSidebar userRole={userRole} userName={userName} />
 
         <div className="lg:pl-64 flex flex-col min-h-screen">
           <Header 
