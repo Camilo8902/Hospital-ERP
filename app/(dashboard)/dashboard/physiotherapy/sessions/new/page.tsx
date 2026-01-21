@@ -5,6 +5,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ArrowLeft, Save, Loader2, Calendar, Clock, Activity, AlertCircle, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { getPhysioAppointmentById } from '@/lib/actions/physiotherapy';
+
+// Función helper del lado del cliente para obtener cita de fisioterapia
+async function fetchPhysioAppointment(appointmentId: string) {
+  const result = await getPhysioAppointmentById(appointmentId);
+  if (result.success && result.data) {
+    return { data: result.data, error: null };
+  }
+  return { data: null, error: result.error };
+}
 
 interface AppointmentInfo {
   id: string;
@@ -73,32 +83,14 @@ export default function NewPhysioSessionForm() {
     const loadAppointmentData = async () => {
       const appointmentId = searchParams.get('appointment_id');
       if (appointmentId) {
-        const { data, error } = await supabase
-          .from('appointments')
-          .select(`
-            id,
-            patient_id,
-            start_time,
-            department_name,
-            reason,
-            patients!inner(full_name, dni)
-          `)
-          .eq('id', appointmentId)
-          .single();
+        // Usar la función del servidor que filtra por departamento de fisioterapia
+        const { data: appointmentData, error } = await fetchPhysioAppointment(appointmentId);
 
-        if (!error && data) {
-          setAppointmentInfo({
-            id: data.id,
-            patient_id: data.patient_id,
-            patient_full_name: (data.patients as any)?.full_name || 'Unknown',
-            patient_dni: (data.patients as any)?.dni || 'N/A',
-            start_time: data.start_time,
-            department_name: data.department_name,
-            reason: data.reason,
-          });
+        if (!error && appointmentData) {
+          setAppointmentInfo(appointmentData);
 
           // Pre-llenar fecha y hora de la cita
-          const appointmentDate = new Date(data.start_time);
+          const appointmentDate = new Date(appointmentData.start_time);
           setFormData(prev => ({
             ...prev,
             session_date: appointmentDate.toISOString().split('T')[0],
@@ -109,7 +101,7 @@ export default function NewPhysioSessionForm() {
     };
 
     loadAppointmentData();
-  }, [searchParams, supabase]);
+  }, [searchParams]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
