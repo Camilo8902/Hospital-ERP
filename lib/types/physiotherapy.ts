@@ -6,13 +6,12 @@
 export interface PhysioMedicalRecord {
   id: string;
   patient_id: string;
-  therapist_id: string;
+  therapist_id?: string;
   department_id?: string;
   status: 'active' | 'completed' | 'suspended' | 'cancelled';
   
   // Evaluación inicial
-  evaluation_date: string;
-  chief_complaint: string;
+  chief_complaint?: string;
   pain_location?: string;
   pain_scale_baseline?: number;
   pain_duration?: string;
@@ -46,7 +45,7 @@ export interface PhysioMedicalRecord {
   roland_morris_score?: number;
   
   // Diagnóstico
-  clinical_diagnosis: string;
+  clinical_diagnosis?: string;
   icd10_codes?: string[];
   functional_limitations?: string;
   
@@ -56,39 +55,39 @@ export interface PhysioMedicalRecord {
   patient_expectations?: string;
   
   // Documentación
-  initial_photos?: string[];
   informed_consent_signed: boolean;
-  informed_consent_date?: string;
-  consent_document_url?: string;
   
   // Metadatos
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   
-  // Campos relacionados para display
-  patient?: PatientSummary;
-  therapist?: TherapistSummary;
+  // Campos relacionados para display (patients tiene first_name y last_name)
+  patients?: PatientSummary;
+  profiles?: TherapistSummary;
 }
 
-// Resumen de paciente (para display en listas)
+// Resumen de paciente (patients tiene first_name y last_name, medical_record_number)
 export interface PatientSummary {
   id: string;
-  full_name: string;
-  dni: string;
-  date_of_birth?: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  medical_record_number?: string;
+  email?: string;
+  dob?: string;
   age?: number;
   gender?: string;
-  phone?: string;
-  email?: string;
+  address?: string;
 }
 
-// Resumen de terapeuta
+// Resumen de terapeuta (profiles tiene full_name)
 export interface TherapistSummary {
   id: string;
   full_name: string;
   email: string;
   specialty?: string;
   license_number?: string;
+  phone?: string;
 }
 
 // Tipo: Rangos de Movimiento (ROM)
@@ -160,59 +159,52 @@ export interface StrengthGrade {
   ankle_dorsiflexors?: { left?: number; right?: number };
 }
 
-// Tipo: Sesión de Tratamiento (Formato SOAP)
+// Tipo: Sesión de Tratamiento
 export interface PhysioSession {
   id: string;
-  record_id: string;
+  medical_record_id?: string;  // Referencia a medical_records
   appointment_id?: string;
+  patient_id: string;  // Referencia directa a patients
   therapist_id: string;
   
   // Fecha y duración
-  session_date: string;
+  session_date: string;  // tipo date
+  session_time?: string;  // tipo time
   duration_minutes: number;
   
-  // Formato SOAP
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
+  // Notas SOAP
+  subjective?: string;
+  objective?: string;
+  analysis?: string;
+  plan?: string;
   
   // Métricas
-  pain_before?: number;
-  pain_after?: number;
-  vas_current?: number;
-  
-  // ROM en esta sesión
-  rom_session?: ROMMeasurements;
-  rom_improvement?: string;
-  strength_session?: StrengthGrade;
-  strength_improvement?: string;
+  pain_level?: number;
+  body_region?: string;
   
   // Técnicas aplicadas
   techniques_applied?: string[];
-  equipment_used?: string[];
   
-  // Respuesta del paciente
-  patient_response?: string;
-  tolerance?: string;
-  adverse_reactions?: string;
-  
-  // Firma
-  therapist_signature: string;
-  signed_at: string;
-  patient_present: boolean;
-  
-  // Notas adicionales
-  observations?: string;
-  home_exercises?: string;
-  next_session_objectives?: string[];
+  // Campos adicionales del esquema
+  notes?: string;
+  session_number?: number;
+  is_initial_session?: boolean;
+  is_reassessment?: boolean;
+  functional_score?: number;
+  pain_location?: string;
+  rom_affected?: string;
+  muscle_strength_grade?: number;
+  muscle_group?: string;
+  modality?: string;
+  treatment_plan_id?: string;
   
   // Metadatos
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   
   // Campos relacionados
-  record?: PhysioMedicalRecord;
+  physio_medical_records?: PhysioMedicalRecord;
+  patients?: PatientSummary;  // Unión directa a patients
 }
 
 // ============================================
@@ -229,23 +221,23 @@ export interface PhysioDashboardStats {
   completed_sessions_today?: number;
 }
 
-// Item de lista de sesiones (versión simplificada para listas)
+// Item de lista de sesiones
 export interface PhysioSessionListItem {
   id: string;
   session_date: string;
+  session_time?: string;
   duration_minutes: number;
-  patient_present: boolean;
-  patient_name: string;
-  patient_dni: string;
-  pain_before?: number;
-  pain_after?: number;
+  pain_level?: number;
+  patient_name: string;  // Generado como CONCAT(first_name, ' ', last_name)
+  patient_dni?: string;  // medical_record_number de patients
   techniques_applied?: string[];
   therapist_id: string;
-  record_id: string;
-  created_at: string;
+  medical_record_id?: string;
+  patient_id: string;
+  created_at?: string;
 }
 
-// Datos de cita de fisioterapia (para integración con citas)
+// Datos de cita de fisioterapia
 export interface PhysioAppointmentData {
   id: string;
   patient_id: string;
@@ -282,423 +274,87 @@ export interface PhysioSessionsFilter {
 }
 
 // ============================================
-// TIPOS PARA PROTOCOLOS CLÍNICOS
-// ============================================
-
-// Tipo: Protocolo Clínico
-export interface PhysioClinicalProtocol {
-  id: string;
-  name: string;
-  code: string;
-  description?: string;
-  
-  // Clasificación
-  category?: string;
-  subcategory?: string;
-  body_region?: string;
-  condition_type?: string;
-  
-  // Evidencia
-  evidence_level?: string;
-  references?: string[];
-  clinical_guidelines?: string;
-  
-  // Estructura
-  total_sessions: number;
-  session_duration_minutes: number;
-  session_frequency?: string;
-  phases: ProtocolPhase[];
-  
-  // Objetivos
-  therapeutic_objectives?: string[];
-  expected_outcomes?: string;
-  success_criteria?: Record<string, unknown>;
-  
-  // Consideraciones
-  contraindications?: string[];
-  precautions?: string;
-  red_flags?: string[];
-  
-  // Requisitos
-  required_equipment?: string[];
-  required_rooms?: string[];
-  staff_requirements?: string[];
-  
-  // Estado
-  is_active: boolean;
-  created_by?: string;
-  
-  created_at: string;
-  updated_at: string;
-}
-
-// Fase de un protocolo
-export interface ProtocolPhase {
-  phase_number: number;
-  name: string;
-  description: string;
-  objectives: string[];
-  techniques: string[];
-  exercises: string[];
-  criteria_to_advance: string[];
-  estimated_sessions: number;
-}
-
-// ============================================
-// TIPOS PARA PLANES DE TRATAMIENTO
-// ============================================
-
-// Tipo: Plan de Tratamiento
-export interface PhysioTreatmentPlan {
-  id: string;
-  record_id: string;
-  protocol_id?: string;
-  
-  // Fechas
-  start_date: string;
-  expected_end_date?: string;
-  actual_end_date?: string;
-  
-  // Sesiones
-  total_sessions: number;
-  sessions_completed: number;
-  sessions_per_week?: number;
-  
-  // Progreso
-  current_phase: number;
-  progress_percentage: number;
-  last_progress评估?: string;
-  
-  // Estado
-  status: 'active' | 'completed' | 'paused' | 'cancelled' | 'modified';
-  suspension_reason?: string;
-  clinical_notes?: string;
-  
-  // Metadatos
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-  
-  // Campos relacionados
-  protocol?: PhysioClinicalProtocol;
-}
-
-// ============================================
-// TIPOS PARA CONSENTIMIENTO INFORMADO
-// ============================================
-
-// Tipo: Consentimiento Informado
-export interface PhysioInformedConsent {
-  id: string;
-  patient_id: string;
-  record_id?: string;
-  
-  consent_type: 
-    | 'initial_evaluation'
-    | 'treatment_session'
-    | 'electrotherapy'
-    | 'manual_therapy'
-    | 'exercise_program'
-    | 'hydrotherapy'
-    | 'data_processing'
-    | 'photo_documentation'
-    | 'telehealth';
-  
-  procedure_description: string;
-  risks: string;
-  benefits: string;
-  alternatives: string;
-  risks_of_not_treating?: string;
-  
-  // Documento
-  document_version?: string;
-  generated_document_url?: string;
-  
-  // Firmas
-  patient_signature?: string;
-  signed_by_patient: boolean;
-  signed_by_representative: boolean;
-  representative_name?: string;
-  representative_dni?: string;
-  
-  // Validación
-  validated_by?: string;
-  validated_at?: string;
-  
-  // Vigencia
-  valid_from: string;
-  valid_until?: string;
-  status: 'pending' | 'signed' | 'expired' | 'revoked';
-  
-  created_at: string;
-  updated_at: string;
-}
-
-// ============================================
-// TIPOS PARA AUDITORÍA
-// ============================================
-
-// Tipo: Registro de Auditoría
-export interface PhysioAuditLog {
-  id: string;
-  
-  event_type: 
-    | 'record_view'
-    | 'record_create'
-    | 'record_update'
-    | 'record_delete'
-    | 'session_view'
-    | 'session_create'
-    | 'session_update'
-    | 'consent_signed'
-    | 'consent_revoked'
-    | 'data_export'
-    | 'data_correction'
-    | 'access_denied';
-  
-  event_category: string;
-  
-  // Usuario
-  user_id: string;
-  user_role: string;
-  user_name: string;
-  
-  // Registro afectado
-  patient_id?: string;
-  record_id?: string;
-  session_id?: string;
-  record_type?: string;
-  
-  // Detalles
-  action_details?: string;
-  data_accessed?: Record<string, unknown>;
-  data_modified?: Record<string, unknown>;
-  
-  // Contexto
-  ip_address?: string;
-  user_agent?: string;
-  access_point?: string;
-  
-  event_timestamp: string;
-}
-
-// ============================================
-// TIPOS PARA DISPOSITIVOS MÉDICOS
-// ============================================
-
-// Tipo: Dispositivo Médico
-export interface PhysioMedicalDevice {
-  id: string;
-  name: string;
-  brand?: string;
-  model?: string;
-  serial_number?: string;
-  
-  device_type: 
-    | 'mbst'
-    | 'electrotherapy'
-    | 'laser'
-    | 'ultrasound'
-    | 'vacuum'
-    | 'cryotherapy'
-    | 'heat_therapy'
-    | 'traction'
-    | 'compression'
-    | 'rom_measurement'
-    | 'strength_measurement'
-    | 'other';
-  
-  modality?: string;
-  
-  // Especificaciones
-  technical_specs?: Record<string, unknown>;
-  available_programs?: string[];
-  
-  // Estado
-  status: 'available' | 'in_use' | 'maintenance' | 'out_of_service';
-  last_maintenance_date?: string;
-  next_maintenance_date?: string;
-  maintenance_history?: string[];
-  
-  // Calibración
-  calibration_date?: string;
-  calibration_due_date?: string;
-  calibration_certificate_url?: string;
-  
-  // Estadísticas
-  total_sessions_conducted: number;
-  total_hours_used: number;
-  
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-// Tipo: Sesión de Dispositivo
-export interface PhysioDeviceSession {
-  id: string;
-  session_id: string;
-  device_id: string;
-  
-  program_used?: string;
-  intensity?: number;
-  frequency?: number;
-  duration_minutes: number;
-  parameters?: Record<string, unknown>;
-  
-  // Resultado
-  patient_tolerance?: string;
-  adverse_reactions?: string;
-  
-  created_at: string;
-  
-  // Campos relacionados
-  device?: PhysioMedicalDevice;
-}
-
-// ============================================
 // TIPOS PARA FORMULARIOS
 // ============================================
 
 // Formulario de evaluación inicial
 export interface PhysioEvaluationForm {
-  // Datos del paciente
   patient_id: string;
-  
-  // Motivo de consulta
-  chief_complaint: string;
+  chief_complaint?: string;
   pain_location?: string;
   pain_scale_baseline?: number;
   pain_duration?: string;
   pain_type?: string;
   pain_characteristics?: string;
-  
-  // Antecedentes
   surgical_history?: string;
   traumatic_history?: string;
   medical_history?: string;
   family_history?: string;
-  
-  // Alergias y contraindicaciones
   allergies?: string[];
-  contraindicaciones?: string[];
+  contraindications?: string[];
   precautions?: string;
-  
-  // Exploración física
   physical_examination?: string;
   postural_evaluation?: string;
   rom_measurements?: ROMMeasurements;
   strength_grade?: StrengthGrade;
   neurological_screening?: string;
   special_tests?: string;
-  
-  // Escalas funcionales
   vas_score?: number;
   oswestry_score?: number;
   dash_score?: number;
   womac_score?: number;
   roland_morris_score?: number;
-  
-  // Diagnóstico y objetivos
-  clinical_diagnosis: string;
+  clinical_diagnosis?: string;
   icd10_codes?: string[];
   functional_limitations?: string;
   short_term_goals?: string[];
   long_term_goals?: string[];
   patient_expectations?: string;
-  
-  // Consentimiento
   informed_consent_signed: boolean;
 }
 
-// Formulario de sesión SOAP
+// Formulario de sesión
 export interface PhysioSessionForm {
-  record_id: string;
+  medical_record_id?: string;
   appointment_id?: string;
   therapist_id: string;
+  patient_id: string;
   
   // Formato SOAP
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
+  subjective?: string;
+  objective?: string;
+  analysis?: string;
+  plan?: string;
   
   // Métricas
-  pain_before?: number;
-  pain_after?: number;
-  vas_current?: number;
-  
-  // ROM en esta sesión
-  rom_session?: ROMMeasurements;
-  strength_session?: StrengthGrade;
+  pain_level?: number;
+  body_region?: string;
   
   // Técnicas
   techniques_applied?: string[];
-  equipment_used?: string[];
-  
-  // Respuesta
-  patient_response?: string;
-  tolerance?: string;
-  adverse_reactions?: string;
   
   // Notas
-  observations?: string;
-  home_exercises?: string;
-  next_session_objectives?: string[];
+  notes?: string;
   
-  patient_present: boolean;
-}
-
-// ============================================
-// TIPOS PARA ESTADÍSTICAS Y REPORTES
-// ============================================
-
-// Paciente activo en fisioterapia
-export interface ActivePhysioPatient {
-  patient_id: string;
-  patient_name: string;
-  dni: string;
-  record_id: string;
-  evaluation_date: string;
-  clinical_diagnosis: string;
-  total_sessions: number;
-  last_session_date?: string;
-  status: string;
-}
-
-// Estadísticas de fisioterapeuta
-export interface PhysioTherapistStats {
-  therapist_id: string;
-  therapist_name: string;
-  total_patients: number;
-  total_sessions: number;
-  avg_days_on_treatment?: number;
-}
-
-// Resumen de evolución del paciente
-export interface PatientEvolutionSummary {
-  record_id: string;
-  patient_id: string;
-  patient_name: string;
-  start_date: string;
-  total_sessions: number;
-  pain_progression: {
-    dates: string[];
-    values: number[];
-  };
-  rom_progression: {
-    joint: string;
-    dates: string[];
-    left_values: number[];
-    right_values: number[];
-  }[];
+  // Campos adicionales
+  session_number?: number;
+  session_date?: string;
+  session_time?: string;
+  duration_minutes?: number;
+  is_initial_session?: boolean;
+  is_reassessment?: boolean;
+  functional_score?: number;
+  pain_location?: string;
+  rom_affected?: string;
+  muscle_strength_grade?: number;
+  muscle_group?: string;
+  modality?: string;
 }
 
 // ============================================
 // CONSTANTES
 // ============================================
 
-// Técnicas de fisioterapia comunes
 export const PHYSIOTHERAPY_TECHNIQUES = [
   'Movilización articular',
   'Movilización neural',
@@ -726,7 +382,6 @@ export const PHYSIOTHERAPY_TECHNIQUES = [
   'Reeducación postural',
 ] as const;
 
-// Equipos disponibles
 export const PHYSIOTHERAPY_EQUIPMENT = [
   'MBST (Resonancia Magnética Terapéutica)',
   'Láser de alta potencia',
@@ -745,9 +400,8 @@ export const PHYSIOTHERAPY_EQUIPMENT = [
   'Plataformas de equilibrio',
 ] as const;
 
-// Regiones corporales
 export const BODY_REGIONS = [
-  ' Cervical',
+  'Cervical',
   'Hombro',
   'Codo',
   'Muñeca/Mano',
@@ -756,40 +410,12 @@ export const BODY_REGIONS = [
   'Cadera',
   'Rodilla',
   'Tobillo/Pie',
-  '全身 (全身)',
 ] as const;
 
-// Condiciones comunes
-export const COMMON_CONDITIONS = [
-  'Lumbalgia aguda',
-  'Lumbalgia crónica',
-  'Lumbar hernia discal',
-  'Cervicalgia',
-  'Cervicobraquialgia',
-  'Hombro doloroso',
-  'Hombro congelado',
-  'Rotura del manguito rotador',
-  'Epicondilitis lateral',
-  'Epicondilitis medial',
-  'Síndrome del túnel carpiano',
-  'Gonartrosis',
-  'Coxartrosis',
-  'Esguince de tobillo',
-  'Fascitis plantar',
-  'Lesiones deportivas',
-  'Post-cirugía',
-  'Rehabilitación neurológica',
-  'Pediatría',
-  'Geriatría',
-] as const;
-
-// Tipos de escalas funcionales
 export const FUNCTIONAL_SCALES = {
   VAS: 'Escala Visual Analógica del Dolor (0-10)',
   OSWESTRY: 'Índice de Discapacidad Oswestry',
   DASH: 'Cuestionario DASH',
   WOMAC: 'Índice WOMAC para artrosis',
   ROLAND_MORRIS: 'Cuestionario de Discapacidad Roland-Morris',
-  EQ_5D: 'EQ-5D - Calidad de vida',
-  SF_36: 'SF-36 - Estado de salud',
 } as const;

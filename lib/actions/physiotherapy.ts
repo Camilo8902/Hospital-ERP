@@ -5,7 +5,6 @@ import { revalidatePath } from 'next/cache';
 import { 
   PhysioMedicalRecord, 
   PhysioSession, 
-  PhysioEvaluationForm, 
   PhysioSessionForm,
   PhysioDashboardStats,
   PhysioSessionListItem,
@@ -18,9 +17,9 @@ import {
 
 export interface CreatePhysioRecordInput {
   patient_id: string;
-  therapist_id: string;
+  therapist_id?: string;
   department_id?: string;
-  chief_complaint: string;
+  chief_complaint?: string;
   pain_location?: string;
   pain_scale_baseline?: number;
   pain_duration?: string;
@@ -44,7 +43,7 @@ export interface CreatePhysioRecordInput {
   dash_score?: number;
   womac_score?: number;
   roland_morris_score?: number;
-  clinical_diagnosis: string;
+  clinical_diagnosis?: string;
   icd10_codes?: string[];
   functional_limitations?: string;
   short_term_goals?: string[];
@@ -118,7 +117,7 @@ export async function getPhysioRecord(recordId: string): Promise<{ success: bool
     
     const { data, error } = await adminSupabase
       .from('physio_medical_records')
-      .select('*, patients(*)')
+      .select('*, patients(first_name, last_name, phone, medical_record_number)')
       .eq('id', recordId)
       .single();
 
@@ -167,7 +166,7 @@ export async function getActivePhysioRecords(
     
     let query = adminSupabase
       .from('physio_medical_records')
-      .select('*, patients(*)')
+      .select('*, patients(first_name, last_name, phone, medical_record_number)')
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
@@ -231,31 +230,30 @@ export async function createPhysioSession(input: PhysioSessionForm): Promise<{ s
     const { data, error } = await adminSupabase
       .from('physio_sessions')
       .insert({
-        record_id: input.record_id,
+        medical_record_id: input.medical_record_id,
         appointment_id: input.appointment_id,
+        patient_id: input.patient_id,
         therapist_id: input.therapist_id,
         subjective: input.subjective,
         objective: input.objective,
-        assessment: input.assessment,
+        analysis: input.analysis,
         plan: input.plan,
-        pain_before: input.pain_before,
-        pain_after: input.pain_after,
-        vas_current: input.vas_current,
-        rom_session: input.rom_session,
-        strength_session: input.strength_session,
+        pain_level: input.pain_level,
+        body_region: input.body_region,
         techniques_applied: input.techniques_applied,
-        equipment_used: input.equipment_used,
-        patient_response: input.patient_response,
-        tolerance: input.tolerance,
-        adverse_reactions: input.adverse_reactions,
-        observations: input.observations,
-        home_exercises: input.home_exercises,
-        next_session_objectives: input.next_session_objectives,
-        patient_present: input.patient_present,
-        therapist_signature: input.therapist_id,
-        signed_at: new Date().toISOString(),
-        duration_minutes: 60,
-        session_date: new Date().toISOString(),
+        notes: input.notes,
+        session_number: input.session_number,
+        session_date: input.session_date || new Date().toISOString().split('T')[0],
+        session_time: input.session_time,
+        duration_minutes: input.duration_minutes || 45,
+        is_initial_session: input.is_initial_session,
+        is_reassessment: input.is_reassessment,
+        functional_score: input.functional_score,
+        pain_location: input.pain_location,
+        rom_affected: input.rom_affected,
+        muscle_strength_grade: input.muscle_strength_grade,
+        muscle_group: input.muscle_group,
+        modality: input.modality,
       })
       .select()
       .single();
@@ -266,7 +264,9 @@ export async function createPhysioSession(input: PhysioSessionForm): Promise<{ s
     }
 
     revalidatePath('/dashboard/physiotherapy');
-    revalidatePath(`/dashboard/physiotherapy/records/${input.record_id}`);
+    if (input.medical_record_id) {
+      revalidatePath(`/dashboard/physiotherapy/records/${input.medical_record_id}`);
+    }
     return { success: true, data: data as PhysioSession };
   } catch (error) {
     console.error('Error inesperado al crear sesión:', error);
@@ -283,7 +283,7 @@ export async function getPhysioSessions(
     const { data, error } = await adminSupabase
       .from('physio_sessions')
       .select('*')
-      .eq('record_id', recordId)
+      .eq('medical_record_id', recordId)
       .order('session_date', { ascending: false });
 
     if (error) {
@@ -362,11 +362,11 @@ export async function searchPhysioPatients(
   try {
     const adminSupabase = createAdminClient();
     
-    // Primero buscar pacientes por nombre o DNI
+    // patients tiene first_name y last_name, no full_name
     const { data: patients } = await adminSupabase
       .from('patients')
       .select('id')
-      .or(`full_name.ilike.%${query}%,dni.ilike.%${query}%`)
+      .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,medical_record_number.ilike.%${query}%`)
       .limit(10);
 
     if (!patients || patients.length === 0) {
@@ -375,10 +375,9 @@ export async function searchPhysioPatients(
 
     const patientIds = patients.map(p => p.id);
 
-    // Luego buscar sus registros de fisioterapia
     const { data, error } = await adminSupabase
       .from('physio_medical_records')
-      .select('*, patients(*)')
+      .select('*, patients(first_name, last_name, phone, medical_record_number)')
       .in('patient_id', patientIds)
       .eq('status', 'active')
       .order('created_at', { ascending: false });
@@ -449,7 +448,7 @@ export async function getPhysioAppointmentById(
         start_time,
         department_id,
         reason,
-        patients!inner(full_name, dni)
+        patients!inner(first_name, last_name, medical_record_number)
       `)
       .eq('id', appointmentId)
       .single();
@@ -467,13 +466,17 @@ export async function getPhysioAppointmentById(
       };
     }
 
+    // patients tiene first_name y last_name, no full_name
+    const patientData = data.patients as any;
+    const patientFullName = `${patientData?.first_name || ''} ${patientData?.last_name || ''}`.trim();
+
     return {
       success: true,
       data: {
         id: data.id,
         patient_id: data.patient_id,
-        patient_full_name: (data.patients as any)?.full_name || 'Unknown',
-        patient_dni: (data.patients as any)?.dni || 'N/A',
+        patient_full_name: patientFullName || 'Unknown',
+        patient_dni: patientData?.medical_record_number || 'N/A',
         start_time: data.start_time,
         department_name: data.department_id || 'Fisioterapia',
         reason: data.reason || '',
@@ -518,7 +521,7 @@ export async function getPhysioAppointments(
         reason,
         notes,
         doctor_id,
-        patients!inner(full_name, dni)
+        patients!inner(first_name, last_name, medical_record_number)
       `)
       .eq('department_id', physioDeptId)
       .order('start_time', { ascending: false });
@@ -547,18 +550,21 @@ export async function getPhysioAppointments(
     }
 
     // Transformar datos para incluir información del paciente
-    const appointmentsWithPatient = (data || []).map(apt => ({
-      id: apt.id,
-      patient_id: apt.patient_id,
-      patient_full_name: (apt.patients as any)?.full_name || 'Unknown',
-      patient_dni: (apt.patients as any)?.dni || 'N/A',
-      start_time: apt.start_time,
-      end_time: apt.end_time,
-      status: apt.status,
-      reason: apt.reason,
-      notes: apt.notes,
-      doctor_id: apt.doctor_id,
-    }));
+    const appointmentsWithPatient = (data || []).map(apt => {
+      const patientData = apt.patients as any;
+      return {
+        id: apt.id,
+        patient_id: apt.patient_id,
+        patient_full_name: `${patientData?.first_name || ''} ${patientData?.last_name || ''}`.trim(),
+        patient_dni: patientData?.medical_record_number || 'N/A',
+        start_time: apt.start_time,
+        end_time: apt.end_time,
+        status: apt.status,
+        reason: apt.reason,
+        notes: apt.notes,
+        doctor_id: apt.doctor_id,
+      };
+    });
 
     return { success: true, data: appointmentsWithPatient };
   } catch (error) {
@@ -568,7 +574,7 @@ export async function getPhysioAppointments(
 }
 
 // ============================================
-// ESTADÍSTICAS DEL DASHBOARD (RPC)
+// ESTADÍSTICAS DEL DASHBOARD
 // ============================================
 
 export async function getPhysioDashboardStats(
@@ -591,12 +597,12 @@ export async function getPhysioDashboardStats(
       return { success: true, data: rpcData as PhysioDashboardStats };
     }
 
-    // Fallback a consultas directas si la función RPC no existe
-    console.warn('Función RPC get_physio_dashboard_stats no disponible, usando consultas directas');
+    // Fallback a consultas directas
+    console.warn('Función RPC no disponible, usando consultas directas');
     
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const startOfWeek = new Date(now.getTime() - now.getDay() * 24 * 60 * 60 * 1000).toISOString();
+    const today = new Date().toISOString().split('T')[0];
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const startOfWeek = new Date(Date.now() - new Date().getDay() * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // Pacientes activos
     let activeQuery = adminSupabase
@@ -634,21 +640,28 @@ export async function getPhysioDashboardStats(
 
     const { count: sessionsThisWeek } = await weekQuery;
 
-    // Promedio de reducción de dolor
+    // Sesiones completadas hoy
+    let todayQuery = adminSupabase
+      .from('physio_sessions')
+      .select('id', { count: 'exact' })
+      .eq('session_date', today);
+
+    if (therapistId) {
+      todayQuery = todayQuery.eq('therapist_id', therapistId);
+    }
+
+    const { count: completedSessionsToday } = await todayQuery;
+
+    // Promedio de nivel de dolor
     const { data: sessions } = await adminSupabase
       .from('physio_sessions')
-      .select('pain_before, pain_after')
-      .not('pain_before', 'is', null)
-      .not('pain_after', 'is', null);
+      .select('pain_level')
+      .not('pain_level', 'is', null);
 
-    let averagePainReduction = 0;
+    let averagePainLevel = 0;
     if (sessions && sessions.length > 0) {
-      const totalReduction = sessions.reduce((sum, s) => {
-        const before = s.pain_before as number;
-        const after = s.pain_after as number;
-        return sum + (before - after);
-      }, 0);
-      averagePainReduction = Math.round((totalReduction / sessions.length) * 10) / 10;
+      const total = sessions.reduce((sum, s) => sum + ((s.pain_level as number) || 0), 0);
+      averagePainLevel = Math.round((total / sessions.length) * 10) / 10;
     }
 
     return {
@@ -657,9 +670,9 @@ export async function getPhysioDashboardStats(
         active_patients: activePatients || 0,
         sessions_this_month: sessionsThisMonth || 0,
         sessions_this_week: sessionsThisWeek || 0,
-        average_pain_reduction: averagePainReduction,
+        average_pain_reduction: averagePainLevel,
         pending_appointments: 0,
-        completed_sessions_today: 0,
+        completed_sessions_today: completedSessionsToday || 0,
       },
     };
   } catch (error) {
@@ -669,7 +682,7 @@ export async function getPhysioDashboardStats(
 }
 
 // ============================================
-// LISTA DE SESIONES CON FILTROS (RPC)
+// LISTA DE SESIONES CON FILTROS
 // ============================================
 
 export async function getPhysioSessionsList(
@@ -683,30 +696,12 @@ export async function getPhysioSessionsList(
   try {
     const adminSupabase = createAdminClient();
     
-    // Intentar usar la función RPC para listar sesiones con filtros
-    const { data: rpcData, error: rpcError, count } = await adminSupabase
-      .from('physio_sessions_view')
-      .select('*', { count: 'exact' })
-      .range(filters.offset || 0, (filters.offset || 0) + (filters.limit || 20) - 1);
-
-    if (!rpcError && rpcData) {
-      return { 
-        success: true, 
-        data: rpcData as PhysioSessionListItem[],
-        count: count || 0
-      };
-    }
-
-    // Fallback a consulta directa con filtros manuales
-    console.warn('Vista physio_sessions_view no disponible, usando consulta directa');
-    
+    // physio_sessions se une directamente a patients a través de patient_id
     let query = adminSupabase
       .from('physio_sessions')
       .select(`
         *,
-        physio_medical_records!inner (
-          patients (id, full_name, dni)
-        )
+        patients!inner (id, first_name, last_name, medical_record_number, phone)
       `, { count: 'exact' });
 
     // Aplicar filtros
@@ -738,15 +733,15 @@ export async function getPhysioSessionsList(
     const sessionList: PhysioSessionListItem[] = (data || []).map(session => ({
       id: session.id,
       session_date: session.session_date,
+      session_time: session.session_time,
       duration_minutes: session.duration_minutes,
-      patient_present: session.patient_present,
-      patient_name: session.physio_medical_records?.patients?.full_name || 'Sin paciente',
-      patient_dni: session.physio_medical_records?.patients?.dni || '',
-      pain_before: session.pain_before,
-      pain_after: session.pain_after,
+      pain_level: session.pain_level,
+      patient_name: `${session.patients?.first_name || ''} ${session.patients?.last_name || ''}`.trim(),
+      patient_dni: session.patients?.medical_record_number,
       techniques_applied: session.techniques_applied,
       therapist_id: session.therapist_id,
-      record_id: session.record_id,
+      medical_record_id: session.medical_record_id,
+      patient_id: session.patient_id,
       created_at: session.created_at,
     }));
 
@@ -777,7 +772,7 @@ export async function getRecentPhysioRecords(
     
     const { data, error } = await adminSupabase
       .from('physio_medical_records')
-      .select('*, patients(*)')
+      .select('*, patients(first_name, last_name, phone, medical_record_number)')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -807,17 +802,13 @@ export async function getTodayPhysioSessions(
 }> {
   try {
     const adminSupabase = createAdminClient();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const today = new Date().toISOString().split('T')[0];
 
     let query = adminSupabase
       .from('physio_sessions')
-      .select('*, physio_medical_records!inner(patients(*))')
-      .gte('session_date', today.toISOString())
-      .lt('session_date', tomorrow.toISOString())
-      .order('session_date', { ascending: true });
+      .select('*, patients(id, first_name, last_name, medical_record_number, phone)')
+      .eq('session_date', today)
+      .order('session_time', { ascending: true });
 
     if (therapistId) {
       query = query.eq('therapist_id', therapistId);
