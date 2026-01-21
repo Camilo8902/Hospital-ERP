@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -107,20 +107,36 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Optimización: Cargar departamentos solo una vez y cuando sea necesario
   useEffect(() => {
+    let mounted = true;
+
     const loadDepartments = async () => {
+      // Skip si ya tenemos datos cargados
+      if (departments.length > 0 && !isLoadingDepartments) {
+        return;
+      }
+
       try {
         const depts = await getDepartmentsForSidebar(userRole);
-        setDepartments(depts);
+        if (mounted) {
+          setDepartments(depts);
+        }
       } catch (error) {
         console.error('Error loading departments:', error);
       } finally {
-        setIsLoadingDepartments(false);
+        if (mounted) {
+          setIsLoadingDepartments(false);
+        }
       }
     };
 
     loadDepartments();
-  }, [userRole]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [userRole, departments.length, isLoadingDepartments]);
 
   // Filtrar módulos estáticos por rol
   const visibleStaticModules = staticModules.filter((item) =>
@@ -225,17 +241,17 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin">
-        {/* Módulos estáticos */}
-        {visibleStaticModules.map((item) =>
+        {/* Módulos estáticos - Primera sección (antes de Departamentos): Dashboard, Pacientes, Citas */}
+        {visibleStaticModules.slice(0, 3).map((item) =>
           renderNavItem(item, pathname === item.href || pathname.startsWith(item.href + '/'), collapsed)
         )}
 
-        {/* Separador si hay módulos estáticos y departamentos */}
-        {visibleStaticModules.length > 0 && departments.length > 0 && (
+        {/* Separador antes de Departamentos */}
+        {departments.length > 0 && (
           <div className="my-3 border-t border-gray-200" />
         )}
 
-        {/* Sección de Departamentos */}
+        {/* Sección de Departamentos - Justo después de Citas */}
         {departments.length > 0 && (
           <>
             {!collapsed ? (
@@ -278,6 +294,16 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
               </div>
             )}
           </>
+        )}
+
+        {/* Separador después de Departamentos (si hay módulos después) */}
+        {departments.length > 0 && visibleStaticModules.length > 3 && (
+          <div className="my-3 border-t border-gray-200" />
+        )}
+
+        {/* Módulos estáticos - Segunda sección (después de Departamentos): Usuarios, Configuración */}
+        {visibleStaticModules.slice(3).map((item) =>
+          renderNavItem(item, pathname === item.href || pathname.startsWith(item.href + '/'), collapsed)
         )}
       </nav>
 
@@ -340,9 +366,9 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {/* Módulos estáticos */}
+          {/* Módulos estáticos - Primera sección (antes de Departamentos): Dashboard, Pacientes, Citas */}
           <div className="p-3 space-y-1">
-            {visibleStaticModules.map((item) => {
+            {visibleStaticModules.slice(0, 3).map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               return (
                 <Link
@@ -358,12 +384,12 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
             })}
           </div>
 
-          {/* Separador */}
-          {visibleStaticModules.length > 0 && departments.length > 0 && (
+          {/* Separador antes de Departamentos */}
+          {departments.length > 0 && (
             <div className="mx-3 border-t border-gray-200" />
           )}
 
-          {/* Departamentos */}
+          {/* Departamentos - Justo después de Citas */}
           <div className="p-3 space-y-1">
             <button
               onClick={() => setDepartmentsExpanded(!departmentsExpanded)}
@@ -404,6 +430,31 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
               </div>
             ) : null}
           </div>
+
+          {/* Separador después de Departamentos (si hay módulos después) */}
+          {departments.length > 0 && visibleStaticModules.length > 3 && (
+            <div className="mx-3 border-t border-gray-200" />
+          )}
+
+          {/* Módulos estáticos - Segunda sección (después de Departamentos): Usuarios, Configuración */}
+          {visibleStaticModules.length > 3 && (
+            <div className="p-3 space-y-1">
+              {visibleStaticModules.slice(3).map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={handleNavigation}
+                    className={cn('sidebar-link', isActive && 'sidebar-link-active')}
+                  >
+                    <item.icon className={cn('w-5 h-5 flex-shrink-0', isActive && 'text-primary-600')} />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="p-3 border-t border-gray-200">
