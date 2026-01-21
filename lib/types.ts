@@ -701,3 +701,246 @@ export interface PaymentConfirmationResult {
   clientSecret: string;
   error?: string;
 }
+
+// ============================================
+// TIPOS PARA INTEGRACIÓN DE FISIOTERAPIA EN HISTORIA CLÍNICA
+// ============================================
+
+// Extendemos el tipo ClinicalRecord para incluir fisioterapia
+export type ExtendedRecordType = 
+  | 'consultation' 
+  | 'progress_note' 
+  | 'procedure' 
+  | 'discharge' 
+  | 'referral' 
+  | 'lab_result' 
+  | 'imaging_result'
+  | 'physiotherapy'; // Nuevo tipo para registros de fisioterapia
+
+// Capítulo de fisioterapia (modelo SOAP)
+export interface PhysioChapter {
+  id: string;
+  clinical_record_id: string;
+  patient_id: string;
+  therapist_id?: string;
+  appointment_id?: string;
+  
+  // Campo S: Subjetivo
+  subjective?: string;
+  
+  // Campo O: Objetivo
+  objective?: string;
+  
+  // Campo A: Análisis
+  analysis?: string;
+  
+  // Campo P: Plan
+  plan?: string;
+  
+  // Métricas específicas
+  pain_level?: number;
+  pain_location?: string;
+  pain_type?: string;
+  
+  // Rango de movimiento
+  rom_affected?: string;
+  rom_measure?: string;
+  
+  // Fortaleza muscular
+  muscle_strength_grade?: number;
+  muscle_group?: string;
+  
+  // Técnicas
+  techniques_applied?: string[];
+  modality?: string; // 'manual', 'instrumental', 'ejercicio', 'hidroterapia'
+  
+  // Evaluación funcional
+  functional_score?: number;
+  functional_limitations?: string;
+  functional_goals?: string;
+  
+  // Sesión
+  session_duration_minutes?: number;
+  session_number?: number;
+  total_sessions_planned?: number;
+  
+  // Flags clínicos
+  is_initial_session?: boolean;
+  is_reassessment?: boolean;
+  treatment_continued?: boolean;
+  
+  // Consentimiento
+  informed_consent?: boolean;
+  consent_document_url?: string;
+  
+  // Notas
+  notes?: string;
+  private_notes?: string;
+  
+  created_at: string;
+  updated_at: string;
+}
+
+// Registro clínico extendido con capítulo de fisioterapia
+export interface ExtendedClinicalRecord {
+  id: string;
+  visit_date: string;
+  record_type: ExtendedRecordType;
+  chief_complaint?: string;
+  diagnosis: any[] | null;
+  treatment_plan?: string;
+  doctor_id?: string;
+  follow_up_required: boolean;
+  created_at: string;
+  updated_at: string;
+  
+  // Datos del médico/terapeuta
+  profiles?: {
+    full_name: string;
+    specialty?: string | null;
+  } | null;
+  
+  // Capítulo de fisioterapia (opcional, solo si record_type === 'physiotherapy')
+  physio_chapter?: PhysioChapter | null;
+}
+
+// Plan de tratamiento de fisioterapia
+export interface PhysioTreatmentPlan {
+  id: string;
+  patient_id: string;
+  prescribing_doctor_id?: string;
+  department_id?: string;
+  
+  diagnosis_code?: string;
+  diagnosis_description?: string;
+  
+  plan_type: 'rehabilitation' | 'pain_management' | 'post_surgical' | 'sports' | 'preventive';
+  clinical_objective?: string;
+  
+  start_date: string;
+  expected_end_date?: string;
+  actual_end_date?: string;
+  
+  status: 'active' | 'completed' | 'suspended' | 'cancelled';
+  
+  sessions_per_week?: number;
+  total_sessions_prescribed?: number;
+  
+  initial_assessment?: string;
+  baseline_rom?: string;
+  baseline_functional_score?: number;
+  
+  progress_notes?: string[];
+  outcome_measures?: string[];
+  
+  notes?: string;
+  
+  created_at: string;
+  updated_at: string;
+}
+
+// Sesión individual de fisioterapia
+export interface PhysioSession {
+  id: string;
+  treatment_plan_id?: string;
+  physio_chapter_id?: string;
+  appointment_id?: string;
+  
+  session_number: number;
+  session_date: string;
+  session_time: string;
+  duration_minutes: number;
+  
+  pain_level_before?: number;
+  pain_level_after?: number;
+  
+  rom_before?: string;
+  rom_after?: string;
+  
+  techniques_used?: string[];
+  equipment_used?: string[];
+  
+  patient_response?: string;
+  tolerance_level?: 'excellent' | 'good' | 'fair' | 'poor';
+  
+  home_exercises?: string;
+  instructions?: string;
+  
+  attendance_status: 'completed' | 'missed' | 'cancelled' | 'rescheduled';
+  cancellation_reason?: string;
+  
+  therapist_id?: string;
+  
+  created_at: string;
+  updated_at: string;
+}
+
+// Estadísticas de fisioterapia para un paciente
+export interface PhysioPatientStats {
+  totalSessions: number;
+  completedSessions: number;
+  missedSessions: number;
+  averagePainLevel: number;
+  averageFunctionalScore: number;
+  painImprovement: number; // Porcentaje de mejora
+  functionalImprovement: number; // Porcentaje de mejora
+  treatmentPlanStatus: 'active' | 'completed' | 'suspended' | 'cancelled';
+  currentSessionNumber: number;
+  remainingSessions: number;
+}
+
+// Formulario para crear registro de fisioterapia
+export interface PhysioRecordFormData {
+  patient_id: string;
+  appointment_id?: string;
+  visit_date: string;
+  chief_complaint: string;
+  diagnosis: Array<{ code: string; description: string }>;
+  treatment_plan: string;
+  
+  // Datos SOAP
+  subjective?: string;
+  objective?: string;
+  analysis?: string;
+  plan?: string;
+  
+  // Métricas
+  pain_level?: number;
+  pain_location?: string;
+  pain_type?: string;
+  
+  // ROM
+  rom_affected?: string;
+  rom_measure?: string;
+  
+  // Fortaleza
+  muscle_strength_grade?: number;
+  muscle_group?: string;
+  
+  // Técnicas
+  techniques_applied?: string[];
+  modality?: string;
+  
+  // Funcional
+  functional_score?: number;
+  functional_limitations?: string;
+  functional_goals?: string;
+  
+  // Sesión
+  session_duration_minutes?: number;
+  session_number?: number;
+  total_sessions_planned?: number;
+  
+  // Flags
+  is_initial_session?: boolean;
+  is_reassessment?: boolean;
+  treatment_continued?: boolean;
+  
+  // Consentimiento
+  informed_consent?: boolean;
+  consent_document_url?: string;
+  
+  // Notas
+  notes?: string;
+  private_notes?: string;
+}

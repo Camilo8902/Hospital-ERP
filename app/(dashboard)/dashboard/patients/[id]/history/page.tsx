@@ -17,6 +17,11 @@ import {
   ChevronRight,
   Stethoscope,
   ClipboardList,
+  Activity,
+  Heart,
+  Zap,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { formatDate, truncate, getInitials } from '@/lib/utils';
 
@@ -29,6 +34,34 @@ interface Patient {
   allergies: string[] | null;
 }
 
+interface PhysioChapter {
+  id: string;
+  subjective?: string | null;
+  objective?: string | null;
+  analysis?: string | null;
+  plan?: string | null;
+  pain_level?: number | null;
+  pain_location?: string | null;
+  pain_type?: string | null;
+  rom_affected?: string | null;
+  rom_measure?: string | null;
+  muscle_strength_grade?: number | null;
+  muscle_group?: string | null;
+  techniques_applied?: string[] | null;
+  modality?: string | null;
+  functional_score?: number | null;
+  functional_limitations?: string | null;
+  functional_goals?: string | null;
+  session_duration_minutes?: number | null;
+  session_number?: number | null;
+  total_sessions_planned?: number | null;
+  is_initial_session?: boolean | null;
+  is_reassessment?: boolean | null;
+  treatment_continued?: boolean | null;
+  notes?: string | null;
+  created_at: string;
+}
+
 interface ClinicalRecord {
   id: string;
   visit_date: string;
@@ -39,10 +72,13 @@ interface ClinicalRecord {
   doctor_id: string | null;
   follow_up_required: boolean;
   created_at: string;
+  updated_at: string;
   profiles?: {
     full_name: string;
     specialty: string | null;
   } | null;
+  // Capítulo de fisioterapia (integrado)
+  physio_chapter?: PhysioChapter | null;
 }
 
 interface Appointment {
@@ -361,6 +397,8 @@ export default function PatientHistoryPage() {
                 <option value="procedure">Procedimiento</option>
                 <option value="discharge">Alta</option>
                 <option value="referral">Referencia</option>
+                <option value="lab_result">Laboratorio</option>
+                <option value="physiotherapy">Fisioterapia</option>
               </select>
             </div>
           </div>
@@ -415,6 +453,7 @@ export default function PatientHistoryPage() {
                         record.record_type === 'discharge' ? 'badge-success' :
                         record.record_type === 'referral' ? 'badge-secondary' :
                         record.record_type === 'lab_result' ? 'badge-danger' :
+                        record.record_type === 'physiotherapy' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
                         'badge-gray'
                       }`}>
                         {record.record_type === 'consultation' ? 'Consulta' :
@@ -423,7 +462,8 @@ export default function PatientHistoryPage() {
                          record.record_type === 'discharge' ? 'Alta Médica' :
                          record.record_type === 'referral' ? 'Referencia' :
                          record.record_type === 'lab_result' ? 'Resultado de Laboratorio' :
-                         'Resultado de Imagen'}
+                         record.record_type === 'physiotherapy' ? 'Fisioterapia' :
+                         'Otro'}
                       </span>
                       <span className="text-sm text-gray-500 flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
@@ -434,6 +474,21 @@ export default function PatientHistoryPage() {
                           <Clock className="w-3 h-3" />
                           Seguimiento
                         </span>
+                      )}
+                      {/* Indicadores específicos de fisioterapia */}
+                      {record.record_type === 'physiotherapy' && record.physio_chapter && (
+                        <>
+                          {record.physio_chapter.is_initial_session && (
+                            <span className="badge bg-blue-100 text-blue-700 border border-blue-200">
+                              Sesión Inicial
+                            </span>
+                          )}
+                          {record.physio_chapter.is_reassessment && (
+                            <span className="badge bg-amber-100 text-amber-700 border border-amber-200">
+                              Reevaluación
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -467,6 +522,104 @@ export default function PatientHistoryPage() {
                           Dr. {record.profiles.full_name}
                           {record.profiles.specialty && ` - ${record.profiles.specialty}`}
                         </span>
+                      </div>
+                    )}
+
+                    {/* Datos específicos de fisioterapia (Modelo SOAP) */}
+                    {record.record_type === 'physiotherapy' && record.physio_chapter && (
+                      <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Activity className="w-5 h-5 text-purple-600" />
+                          <span className="font-semibold text-purple-800">Registro de Fisioterapia</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                          {/* Nivel de dolor */}
+                          {record.physio_chapter.pain_level !== null && record.physio_chapter.pain_level !== undefined && (
+                            <div className="flex items-center gap-2 bg-white p-2 rounded">
+                              <Heart className={`w-4 h-4 ${record.physio_chapter.pain_level >= 7 ? 'text-red-500' : record.physio_chapter.pain_level >= 4 ? 'text-amber-500' : 'text-green-500'}`} />
+                              <div>
+                                <p className="text-xs text-gray-500">Dolor</p>
+                                <p className="font-medium">{record.physio_chapter.pain_level}/10</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Score funcional */}
+                          {record.physio_chapter.functional_score !== null && record.physio_chapter.functional_score !== undefined && (
+                            <div className="flex items-center gap-2 bg-white p-2 rounded">
+                              <TrendingUp className="w-4 h-4 text-green-500" />
+                              <div>
+                                <p className="text-xs text-gray-500">Funcional</p>
+                                <p className="font-medium">{record.physio_chapter.functional_score}%</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Sesión */}
+                          {record.physio_chapter.session_number && (
+                            <div className="flex items-center gap-2 bg-white p-2 rounded">
+                              <ClipboardList className="w-4 h-4 text-blue-500" />
+                              <div>
+                                <p className="text-xs text-gray-500">Sesión</p>
+                                <p className="font-medium">#{record.physio_chapter.session_number}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Duración */}
+                          {record.physio_chapter.session_duration_minutes && (
+                            <div className="flex items-center gap-2 bg-white p-2 rounded">
+                              <Clock className="w-4 h-4 text-gray-500" />
+                              <div>
+                                <p className="text-xs text-gray-500">Duración</p>
+                                <p className="font-medium">{record.physio_chapter.session_duration_minutes} min</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Técnicas aplicadas */}
+                        {record.physio_chapter.techniques_applied && record.physio_chapter.techniques_applied.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-xs text-purple-600 mb-1">Técnicas aplicadas:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {record.physio_chapter.techniques_applied.map((technique, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                                  {technique}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Resumen SOAP */}
+                        <div className="space-y-2 mt-3">
+                          {record.physio_chapter.subjective && (
+                            <div className="text-sm">
+                              <span className="font-medium text-purple-700">S:</span>{' '}
+                              <span className="text-gray-600">{truncate(record.physio_chapter.subjective, 100)}</span>
+                            </div>
+                          )}
+                          {record.physio_chapter.objective && (
+                            <div className="text-sm">
+                              <span className="font-medium text-purple-700">O:</span>{' '}
+                              <span className="text-gray-600">{truncate(record.physio_chapter.objective, 100)}</span>
+                            </div>
+                          )}
+                          {record.physio_chapter.analysis && (
+                            <div className="text-sm">
+                              <span className="font-medium text-purple-700">A:</span>{' '}
+                              <span className="text-gray-600">{truncate(record.physio_chapter.analysis, 100)}</span>
+                            </div>
+                          )}
+                          {record.physio_chapter.plan && (
+                            <div className="text-sm">
+                              <span className="font-medium text-purple-700">P:</span>{' '}
+                              <span className="text-gray-600">{truncate(record.physio_chapter.plan, 100)}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

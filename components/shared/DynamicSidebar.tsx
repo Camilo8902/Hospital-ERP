@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  ShoppingCart,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useMobileMenu } from './MobileMenuContext';
@@ -59,6 +60,26 @@ const staticModules = [
     icon: Calendar,
     roles: ['admin', 'doctor', 'nurse', 'reception'],
   },
+];
+
+// Módulos de departamentos hardcodeados (Farmacia y Laboratorio)
+const departmentModules = [
+  {
+    name: 'Farmacia',
+    href: '/dashboard/pharmacy',
+    icon: Pill,
+    roles: ['admin', 'pharmacy'],
+  },
+  {
+    name: 'Laboratorio',
+    href: '/dashboard/lab',
+    icon: FlaskConical,
+    roles: ['admin', 'lab', 'lab_admin'],
+  },
+];
+
+// Módulos administrativos (Usuarios y Configuración)
+const adminModules = [
   {
     name: 'Usuarios',
     href: '/dashboard/users',
@@ -140,6 +161,16 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
 
   // Filtrar módulos estáticos por rol
   const visibleStaticModules = staticModules.filter((item) =>
+    item.roles.includes(userRole as string)
+  );
+
+  // Filtrar módulos de departamentos hardcodeados por rol
+  const visibleDepartmentModules = departmentModules.filter((item) =>
+    item.roles.includes(userRole as string)
+  );
+
+  // Filtrar módulos administrativos por rol
+  const visibleAdminModules = adminModules.filter((item) =>
     item.roles.includes(userRole as string)
   );
 
@@ -241,68 +272,93 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin">
-        {/* Módulos estáticos - Primera sección (antes de Departamentos): Dashboard, Pacientes, Citas */}
-        {visibleStaticModules.slice(0, 3).map((item) =>
+        {/* Módulos estáticos: Dashboard, Pacientes, Citas */}
+        {visibleStaticModules.map((item) =>
           renderNavItem(item, pathname === item.href || pathname.startsWith(item.href + '/'), collapsed)
         )}
 
-        {/* Separador antes de Departamentos */}
+        {/* Módulo desplegable de Departamentos */}
         {departments.length > 0 && (
-          <div className="my-3 border-t border-gray-200" />
-        )}
-
-        {/* Sección de Departamentos - Justo después de Citas */}
-        {departments.length > 0 && (
-          <>
-            {!collapsed ? (
-              <div className="space-y-1">
-                <button
-                  onClick={() => setDepartmentsExpanded(!departmentsExpanded)}
-                  className={cn(
-                    'w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded-lg transition-colors',
-                    departmentsExpanded && 'bg-gray-50'
-                  )}
-                >
-                  <span>Departamentos</span>
-                  {departmentsExpanded ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                </button>
-                {departmentsExpanded && (
-                  <div className="space-y-1 ml-1">
-                    {isLoadingDepartments ? (
-                      <div className="flex items-center justify-center py-3">
-                        <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-                      </div>
-                    ) : (
-                      departments.map((dept) => renderDepartmentItem(dept, collapsed))
+          <div className="space-y-1">
+            {/* Header del módulo Departamentos */}
+            <button
+              onClick={() => setDepartmentsExpanded(!departmentsExpanded)}
+              className={cn(
+                'sidebar-link w-full',
+                (pathname.startsWith('/dashboard/departments/') ||
+                  departments.some(d => pathname.startsWith(d.href))) && 'sidebar-link-active',
+                collapsed && 'justify-center px-2 lg:px-1'
+              )}
+              title={collapsed ? 'Departamentos' : undefined}
+            >
+              <Building2 className={cn(
+                'w-5 h-5 flex-shrink-0',
+                (pathname.startsWith('/dashboard/departments/') ||
+                  departments.some(d => pathname.startsWith(d.href))) && 'text-primary-600'
+              )} />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 text-left truncate">Departamentos</span>
+                  <ChevronDown
+                    className={cn(
+                      'w-4 h-4 transition-transform flex-shrink-0',
+                      departmentsExpanded && 'rotate-180'
                     )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-1">
+                  />
+                </>
+              )}
+            </button>
+
+            {/* Lista de departamentos (expandible) */}
+            {departmentsExpanded && !collapsed && (
+              <div className="ml-4 space-y-1 border-l-2 border-gray-100 pl-3 mt-1">
                 {isLoadingDepartments ? (
-                  <div className="flex items-center justify-center py-2">
-                    <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                  <div className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Cargando...</span>
                   </div>
                 ) : (
-                  departments.map((dept) => renderDepartmentItem(dept, collapsed))
+                  departments.map((dept) => renderDepartmentItem(dept, false))
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
 
-        {/* Separador después de Departamentos (si hay módulos después) */}
-        {departments.length > 0 && visibleStaticModules.length > 3 && (
+        {/* Separador antes de Departamentos hardcodeados */}
+        {visibleDepartmentModules.length > 0 && (
           <div className="my-3 border-t border-gray-200" />
         )}
 
-        {/* Módulos estáticos - Segunda sección (después de Departamentos): Usuarios, Configuración */}
-        {visibleStaticModules.slice(3).map((item) =>
+        {/* Departamentos hardcodeados: Farmacia, Laboratorio */}
+        {visibleDepartmentModules.map((item) =>
+          renderNavItem(item, pathname === item.href || pathname.startsWith(item.href + '/'), collapsed)
+        )}
+
+        {/* Punto de Venta de Farmacia (solo para roles de pharmacy/admin) */}
+        {(userRole === 'pharmacy' || userRole === 'admin') && (
+          <Link
+            href="/dashboard/pharmacy/pos"
+            onClick={handleNavigation}
+            className={cn(
+              'sidebar-link',
+              pathname === '/dashboard/pharmacy/pos' && 'sidebar-link-active',
+              collapsed && 'justify-center px-2 lg:px-1'
+            )}
+            title={collapsed ? 'Punto de Venta' : undefined}
+          >
+            <ShoppingCart className={cn('w-5 h-5 flex-shrink-0', pathname === '/dashboard/pharmacy/pos' && 'text-primary-600')} />
+            {!collapsed && <span className="truncate">Punto de Venta</span>}
+          </Link>
+        )}
+
+        {/* Separador antes de módulos administrativos */}
+        {(visibleDepartmentModules.length > 0 || (userRole === 'pharmacy' || userRole === 'admin')) && visibleAdminModules.length > 0 && (
+          <div className="my-3 border-t border-gray-200" />
+        )}
+
+        {/* Módulos administrativos: Usuarios, Configuración */}
+        {visibleAdminModules.map((item) =>
           renderNavItem(item, pathname === item.href || pathname.startsWith(item.href + '/'), collapsed)
         )}
       </nav>
@@ -366,9 +422,9 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {/* Módulos estáticos - Primera sección (antes de Departamentos): Dashboard, Pacientes, Citas */}
+          {/* Módulos estáticos: Dashboard, Pacientes, Citas */}
           <div className="p-3 space-y-1">
-            {visibleStaticModules.slice(0, 3).map((item) => {
+            {visibleStaticModules.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               return (
                 <Link
@@ -384,77 +440,120 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
             })}
           </div>
 
-          {/* Separador antes de Departamentos */}
+          {/* Módulo desplegable de Departamentos (Mobile) */}
           {departments.length > 0 && (
-            <div className="mx-3 border-t border-gray-200" />
-          )}
-
-          {/* Departamentos - Justo después de Citas */}
-          <div className="p-3 space-y-1">
-            <button
-              onClick={() => setDepartmentsExpanded(!departmentsExpanded)}
-              className={cn(
-                'w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded-lg transition-colors',
-                departmentsExpanded && 'bg-gray-50'
-              )}
-            >
-              <span>Departamentos</span>
-              {departmentsExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-            </button>
-
-            {isLoadingDepartments ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-              </div>
-            ) : departmentsExpanded ? (
-              <div className="space-y-1">
-                {departments.map((dept) => {
-                  const IconComponent = departmentIcons[dept.icon || ''] || Building2;
-                  const isActive = pathname === dept.href || pathname.startsWith(dept.href + '/');
-                  return (
-                    <Link
-                      key={dept.id}
-                      href={dept.href}
-                      onClick={handleNavigation}
-                      className={cn('sidebar-link', isActive && 'sidebar-link-active')}
-                    >
-                      <IconComponent className={cn('w-5 h-5 flex-shrink-0', isActive && 'text-primary-600')} />
-                      <span>{dept.name}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-
-          {/* Separador después de Departamentos (si hay módulos después) */}
-          {departments.length > 0 && visibleStaticModules.length > 3 && (
-            <div className="mx-3 border-t border-gray-200" />
-          )}
-
-          {/* Módulos estáticos - Segunda sección (después de Departamentos): Usuarios, Configuración */}
-          {visibleStaticModules.length > 3 && (
             <div className="p-3 space-y-1">
-              {visibleStaticModules.slice(3).map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={handleNavigation}
-                    className={cn('sidebar-link', isActive && 'sidebar-link-active')}
-                  >
-                    <item.icon className={cn('w-5 h-5 flex-shrink-0', isActive && 'text-primary-600')} />
-                    <span>{item.name}</span>
-                  </Link>
-                );
-              })}
+              <button
+                onClick={() => setDepartmentsExpanded(!departmentsExpanded)}
+                className={cn(
+                  'sidebar-link w-full',
+                  (pathname.startsWith('/dashboard/departments/') ||
+                    departments.some(d => pathname.startsWith(d.href))) && 'sidebar-link-active'
+                )}
+              >
+                <Building2 className={cn(
+                  'w-5 h-5 flex-shrink-0',
+                  (pathname.startsWith('/dashboard/departments/') ||
+                    departments.some(d => pathname.startsWith(d.href))) && 'text-primary-600'
+                )} />
+                <span className="flex-1 text-left">Departamentos</span>
+                <ChevronDown
+                  className={cn(
+                    'w-4 h-4 transition-transform',
+                    departmentsExpanded && 'rotate-180'
+                  )}
+                />
+              </button>
+
+              {/* Lista de departamentos (expandible) */}
+              {departmentsExpanded && (
+                <div className="ml-4 space-y-1 border-l-2 border-gray-100 pl-3 mt-1">
+                  {isLoadingDepartments ? (
+                    <div className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Cargando...</span>
+                    </div>
+                  ) : (
+                    departments.map((dept) => {
+                      const IconComponent = departmentIcons[dept.icon || ''] || Building2;
+                      const isActive = pathname === dept.href || pathname.startsWith(dept.href + '/');
+                      return (
+                        <Link
+                          key={dept.id}
+                          href={dept.href}
+                          onClick={handleNavigation}
+                          className={cn('sidebar-link', isActive && 'sidebar-link-active')}
+                        >
+                          <IconComponent className={cn('w-5 h-5 flex-shrink-0', isActive && 'text-primary-600')} />
+                          <span>{dept.name}</span>
+                        </Link>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
           )}
+
+          {/* Separador antes de Departamentos hardcodeados */}
+          {visibleDepartmentModules.length > 0 && (
+            <div className="mx-3 border-t border-gray-200" />
+          )}
+
+          {/* Departamentos hardcodeados: Farmacia, Laboratorio */}
+          <div className="p-3 space-y-1">
+            {visibleDepartmentModules.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={handleNavigation}
+                  className={cn('sidebar-link', isActive && 'sidebar-link-active')}
+                >
+                  <item.icon className={cn('w-5 h-5 flex-shrink-0', isActive && 'text-primary-600')} />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Punto de Venta de Farmacia */}
+          {(userRole === 'pharmacy' || userRole === 'admin') && (
+            <div className="p-3 space-y-1">
+              <Link
+                href="/dashboard/pharmacy/pos"
+                onClick={handleNavigation}
+                className={cn('sidebar-link', pathname === '/dashboard/pharmacy/pos' && 'sidebar-link-active')}
+              >
+                <ShoppingCart className={cn('w-5 h-5 flex-shrink-0', pathname === '/dashboard/pharmacy/pos' && 'text-primary-600')} />
+                <span>Punto de Venta</span>
+              </Link>
+            </div>
+          )}
+
+          {/* Separador antes de módulos administrativos */}
+          {(visibleDepartmentModules.length > 0 || (userRole === 'pharmacy' || userRole === 'admin')) && visibleAdminModules.length > 0 && (
+            <div className="mx-3 border-t border-gray-200" />
+          )}
+
+          {/* Módulos administrativos: Usuarios, Configuración */}
+          <div className="p-3 space-y-1">
+            {visibleAdminModules.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={handleNavigation}
+                  className={cn('sidebar-link', isActive && 'sidebar-link-active')}
+                >
+                  <item.icon className={cn('w-5 h-5 flex-shrink-0', isActive && 'text-primary-600')} />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
         <div className="p-3 border-t border-gray-200">
