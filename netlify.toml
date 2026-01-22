@@ -1,0 +1,30 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NETLIFY_NEXTJS_SPA_CLIENT = "false"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[[headers]]
+for = "/_next/static/*"
+[headers.values]
+  Cache-Control = "public, max-age=31536000, immutable"
+  X-Content-Type-Options = "nosniff"
+
+[[headers]]
+for = "/_next/data/*"
+[headers.values]
+  Cache-Control = "public, max-age=31536000, immutable"
+  X-Content-Type-Options = "nosniff"
+
+[[headers]]
+for = "/*"
+[headers.values]
+  X-Frame-Options = "DENY"
+  X-XSS-Protection = "1; mode=block"
+  Referrer-Policy = "strict-origin-when-cross-origin"
+  Permissions-Policy = "camera=(), microphone=(), geolocation=()"
