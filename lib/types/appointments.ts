@@ -1,7 +1,7 @@
 // ============================================================================
-// ARCHIVO: types/appointments.ts
+// ARCHIVO: lib/types/appointments.ts
 // Definiciones de tipos para el sistema de citas por departamento
-// Versión: 1.0.0
+// Versión: 1.0.1 (Corrección de compatibilidad de tipos)
 // Fecha: 2026-01-23
 // ============================================================================
 
@@ -98,6 +98,8 @@ export interface PhysioSpecificData {
   therapistNotes?: string;
   /** Duración estimada en minutos */
   estimatedDuration?: number;
+  /** Índice de firma para compatibilidad con Record<string, unknown> */
+  [key: string]: unknown;
 }
 
 /**
@@ -114,6 +116,8 @@ export interface GeneralSpecificData {
   requiresReferral?: boolean;
   /** Tipo de derivación requerida */
   referralType?: 'specialist' | 'laboratory' | 'imaging' | 'physiotherapy';
+  /** Índice de firma para compatibilidad con Record<string, unknown> */
+  [key: string]: unknown;
 }
 
 /**
@@ -130,6 +134,8 @@ export interface LabSpecificData {
   preparationInstructions?: string;
   /** Prioridad de la orden */
   priority?: 'routine' | 'urgent' | 'stat';
+  /** Índice de firma para compatibilidad con Record<string, unknown> */
+  [key: string]: unknown;
 }
 
 /**
@@ -146,6 +152,8 @@ export interface ImagingSpecificData {
   pregnancyRisk?: boolean;
   /** Instrucciones previas al estudio */
   preProcedureInstructions?: string;
+  /** Índice de firma para compatibilidad con Record<string, unknown> */
+  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -160,46 +168,46 @@ export interface BaseAppointment {
   /** Identificador único de la cita */
   id: string;
   /** ID del paciente */
-  patientId: string;
+  patient_id: string;
   /** ID del médico/terapeuta asignado */
-  doctorId?: string | null;
+  doctor_id?: string | null;
   /** ID del departamento */
-  departmentId?: string | null;
+  department_id?: string | null;
   /** ID de la habitación */
-  roomId?: string | null;
+  room_id?: string | null;
   /** Tipo de cita */
-  appointmentType: AppointmentType;
+  appointment_type: AppointmentType;
   /** Estado general de la cita */
   status: AppointmentStatus;
   /** Fecha y hora de inicio */
-  startTime: string;
+  start_time: string;
   /** Fecha y hora de fin */
-  endTime: string;
+  end_time: string;
   /** Razón de la cita */
   reason?: string | null;
   /** Notas adicionales */
   notes?: string | null;
   /** Indicador de recordatorio enviado */
-  reminderSent: boolean;
+  reminder_sent: boolean;
   /** Fecha de creación */
-  createdAt: string;
+  created_at: string;
   /** Fecha de última actualización */
-  updatedAt: string;
+  updated_at: string;
   
   // =========================================================================
   // CAMPOS NUEVOS DE FASE 1
   // =========================================================================
   
   /** Estado del flujo de trabajo */
-  workflowStatus: WorkflowStatus;
+  workflow_status: WorkflowStatus;
   /** Datos específicos del departamento (JSONB) */
-  departmentSpecificData: Record<string, unknown>;
+  department_specific_data: Record<string, unknown>;
   /** Tipo de registro clínico vinculado */
-  clinicalReferenceType?: ClinicalReferenceType | null;
+  clinical_reference_type?: ClinicalReferenceType | null;
   /** ID del registro clínico vinculado */
-  clinicalReferenceId?: string | null;
+  clinical_reference_id?: string | null;
   /** ID del departamento que refiere */
-  referringDepartmentId?: string | null;
+  referring_department_id?: string | null;
 }
 
 // ============================================================================
@@ -210,25 +218,25 @@ export interface BaseAppointment {
  * Interface para citas de fisioterapia.
  * Discriminada por el campo 'department'.
  */
-export interface PhysioAppointment extends BaseAppointment {
+export interface PhysioAppointment extends Omit<BaseAppointment, 'department_specific_data'> {
   /** Tipo de departamento (discriminador) */
   department: 'physiotherapy';
   /** Tipo de cita debe ser fisioterapia */
-  appointmentType: 'physiotherapy';
+  appointment_type: 'physiotherapy';
   /** Datos específicos de fisioterapia */
-  departmentSpecificData: PhysioSpecificData;
+  department_specific_data: PhysioSpecificData;
   /** Datos del paciente para显示 */
   patient?: {
     id: string;
-    firstName: string;
-    lastName: string;
+    first_name: string;
+    last_name: string;
     email?: string;
     phone: string;
   };
   /** Datos del terapeuta */
   therapist?: {
     id: string;
-    fullName: string;
+    full_name: string;
     specialty?: string;
   };
 }
@@ -236,28 +244,28 @@ export interface PhysioAppointment extends BaseAppointment {
 /**
  * Interface para citas de medicina general.
  */
-export interface GeneralAppointment extends BaseAppointment {
+export interface GeneralAppointment extends Omit<BaseAppointment, 'department_specific_data'> {
   department: 'general';
-  appointmentType: 'consultation' | 'follow_up' | 'emergency' | 'procedure';
-  departmentSpecificData: GeneralSpecificData;
+  appointment_type: 'consultation' | 'follow_up' | 'emergency' | 'procedure';
+  department_specific_data: GeneralSpecificData;
 }
 
 /**
  * Interface para citas de laboratorio.
  */
-export interface LabAppointment extends BaseAppointment {
+export interface LabAppointment extends Omit<BaseAppointment, 'department_specific_data'> {
   department: 'laboratory';
-  appointmentType: 'laboratory';
-  departmentSpecificData: LabSpecificData;
+  appointment_type: 'laboratory';
+  department_specific_data: LabSpecificData;
 }
 
 /**
  * Interface para citas de imagenología.
  */
-export interface ImagingAppointment extends BaseAppointment {
+export interface ImagingAppointment extends Omit<BaseAppointment, 'department_specific_data'> {
   department: 'imaging';
-  appointmentType: 'imaging';
-  departmentSpecificData: ImagingSpecificData;
+  appointment_type: 'imaging';
+  department_specific_data: ImagingSpecificData;
 }
 
 // ============================================================================
@@ -279,17 +287,17 @@ export type Appointment =
  * Los campos opcionales tienen valores por defecto en la base de datos.
  */
 export interface CreateAppointmentInput {
-  patientId: string;
-  doctorId?: string;
-  departmentId?: string;
-  roomId?: string;
-  appointmentType: AppointmentType;
-  startTime: string;
-  endTime: string;
+  patient_id: string;
+  doctor_id?: string;
+  department_id?: string;
+  room_id?: string;
+  appointment_type: AppointmentType;
+  start_time: string;
+  end_time: string;
   reason?: string;
   notes?: string;
-  departmentSpecificData?: Record<string, unknown>;
-  referringDepartmentId?: string;
+  department_specific_data?: Record<string, unknown>;
+  referring_department_id?: string;
 }
 
 /**
@@ -297,20 +305,20 @@ export interface CreateAppointmentInput {
  * Todos los campos son opcionales.
  */
 export interface UpdateAppointmentInput {
-  doctorId?: string;
-  departmentId?: string;
-  roomId?: string;
-  appointmentType?: AppointmentType;
+  doctor_id?: string;
+  department_id?: string;
+  room_id?: string;
+  appointment_type?: AppointmentType;
   status?: AppointmentStatus;
-  startTime?: string;
-  endTime?: string;
+  start_time?: string;
+  end_time?: string;
   reason?: string;
   notes?: string;
-  workflowStatus?: WorkflowStatus;
-  departmentSpecificData?: Record<string, unknown>;
-  clinicalReferenceType?: ClinicalReferenceType;
-  clinicalReferenceId?: string;
-  referringDepartmentId?: string;
+  workflow_status?: WorkflowStatus;
+  department_specific_data?: Record<string, unknown>;
+  clinical_reference_type?: ClinicalReferenceType;
+  clinical_reference_id?: string;
+  referring_department_id?: string;
 }
 
 // ============================================================================
@@ -332,21 +340,22 @@ export interface PaginatedAppointments {
  * Respuesta con datos extendidos de citas.
  */
 export interface AppointmentWithDetails extends BaseAppointment {
-  patientName: string;
-  doctorName?: string;
-  departmentName?: string;
+  patient_name: string;
+  doctor_name?: string;
+  department_name?: string;
 }
 
 /**
  * Estadísticas de citas por estado de flujo de trabajo.
+ * Usa snake_case para coincidir con WorkflowStatus y la base de datos.
  */
 export interface AppointmentWorkflowStats {
   scheduled: number;
-  checkedIn: number;
-  inConsultation: number;
+  checked_in: number;
+  in_consultation: number;
   completed: number;
   cancelled: number;
-  noShow: number;
+  no_show: number;
   total: number;
 }
 
@@ -396,7 +405,7 @@ export function isImagingAppointment(
 export function getDepartmentSpecificData<T extends Record<string, unknown>>(
   appointment: Appointment
 ): T {
-  return appointment.departmentSpecificData as T;
+  return appointment.department_specific_data as T;
 }
 
 // ============================================================================
@@ -407,13 +416,13 @@ export function getDepartmentSpecificData<T extends Record<string, unknown>>(
  * Opciones para filtrar citas.
  */
 export interface AppointmentFilters {
-  departmentId?: string | null;
-  workflowStatus?: WorkflowStatus | null;
-  patientId?: string;
-  doctorId?: string;
-  startDate?: string;
-  endDate?: string;
-  appointmentType?: AppointmentType;
+  department_id?: string | null;
+  workflow_status?: WorkflowStatus | null;
+  patient_id?: string;
+  doctor_id?: string;
+  start_date?: string;
+  end_date?: string;
+  appointment_type?: AppointmentType;
   status?: AppointmentStatus;
   limit?: number;
   offset?: number;
@@ -435,20 +444,20 @@ export async function getAppointments(
       department:departments!inner(id, name)
     `);
 
-  if (filters?.departmentId) {
-    query = query.eq('department_id', filters.departmentId);
+  if (filters?.department_id) {
+    query = query.eq('department_id', filters.department_id);
   }
-  if (filters?.workflowStatus) {
-    query = query.eq('workflow_status', filters.workflowStatus);
+  if (filters?.workflow_status) {
+    query = query.eq('workflow_status', filters.workflow_status);
   }
-  if (filters?.patientId) {
-    query = query.eq('patient_id', filters.patientId);
+  if (filters?.patient_id) {
+    query = query.eq('patient_id', filters.patient_id);
   }
-  if (filters?.doctorId) {
-    query = query.eq('doctor_id', filters.doctorId);
+  if (filters?.doctor_id) {
+    query = query.eq('doctor_id', filters.doctor_id);
   }
-  if (filters?.appointmentType) {
-    query = query.eq('appointment_type', filters.appointmentType);
+  if (filters?.appointment_type) {
+    query = query.eq('appointment_type', filters.appointment_type);
   }
   if (filters?.status) {
     query = query.eq('status', filters.status);
@@ -508,15 +517,15 @@ export async function createAppointment(
 ): Promise<Appointment> {
   const { data, error } = await supabase
     .rpc('create_appointment_with_dept_data', {
-      p_patient_id: input.patientId,
-      p_doctor_id: input.doctorId,
-      p_department_id: input.departmentId,
-      p_start_time: input.startTime,
-      p_end_time: input.endTime,
-      p_appointment_type: input.appointmentType,
+      p_patient_id: input.patient_id,
+      p_doctor_id: input.doctor_id,
+      p_department_id: input.department_id,
+      p_start_time: input.start_time,
+      p_end_time: input.end_time,
+      p_appointment_type: input.appointment_type,
       p_reason: input.reason,
-      p_department_specific_data: input.departmentSpecificData || {},
-      p_referring_department_id: input.referringDepartmentId
+      p_department_specific_data: input.department_specific_data || {},
+      p_referring_department_id: input.referring_department_id
     })
     .select()
     .single();
@@ -582,9 +591,9 @@ export async function linkClinicalReference(
 export async function getPhysioAppointments(
   supabase: SupabaseClient,
   filters?: {
-    workflowStatus?: WorkflowStatus | null;
-    patientId?: string;
-    therapistId?: string;
+    workflow_status?: WorkflowStatus | null;
+    patient_id?: string;
+    therapist_id?: string;
     limit?: number;
     offset?: number;
   }
@@ -598,14 +607,14 @@ export async function getPhysioAppointments(
     `)
     .eq('appointment_type', 'physiotherapy');
 
-  if (filters?.workflowStatus) {
-    query = query.eq('workflow_status', filters.workflowStatus);
+  if (filters?.workflow_status) {
+    query = query.eq('workflow_status', filters.workflow_status);
   }
-  if (filters?.patientId) {
-    query = query.eq('patient_id', filters.patientId);
+  if (filters?.patient_id) {
+    query = query.eq('patient_id', filters.patient_id);
   }
-  if (filters?.therapistId) {
-    query = query.eq('doctor_id', filters.therapistId);
+  if (filters?.therapist_id) {
+    query = query.eq('doctor_id', filters.therapist_id);
   }
   if (filters?.limit) {
     query = query.limit(filters.limit);
@@ -648,11 +657,11 @@ export async function getAppointmentWorkflowStats(
 
   const stats: AppointmentWorkflowStats = {
     scheduled: 0,
-    checkedIn: 0,
-    inConsultation: 0,
+    checked_in: 0,
+    in_consultation: 0,
     completed: 0,
     cancelled: 0,
-    noShow: 0,
+    no_show: 0,
     total: data?.length || 0
   };
 
