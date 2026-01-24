@@ -286,7 +286,7 @@ export function GeneralAppointmentForm({
             <DateTimePicker
               label="Fecha y Hora de Inicio *"
               value={formData.start_time}
-              onChange={(value: string)  =>
+              onChange={(value: string) =>
                 setFormData((prev) => ({ ...prev, start_time: value }))
               }
               required
@@ -294,7 +294,7 @@ export function GeneralAppointmentForm({
             <DateTimePicker
               label="Fecha y Hora de Fin *"
               value={formData.end_time}
-              onChange={(value) =>
+              onChange={(value: string) =>
                 setFormData((prev) => ({ ...prev, end_time: value }))
               }
               required
