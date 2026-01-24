@@ -4,8 +4,13 @@ import { Suspense, lazy } from 'react';
 import { Loader2 } from 'lucide-react';
 
 // Lazy loading de los formularios por departamento
-const GeneralAppointmentForm = lazy(() => import('../forms/GeneralAppointmentForm').then(module => ({ default: module.GeneralAppointmentForm })));
-const PhysiotherapyForm = lazy(() => import('../forms/PhysiotherapyForm').then(module => ({ default: module.PhysiotherapyForm })));
+// Usamos el workaround de módulo intermedio para exports nombrados
+const GeneralAppointmentForm = lazy(() => 
+  import('../forms/GeneralAppointmentForm').then(module => ({ default: module.GeneralAppointmentForm }))
+);
+const PhysiotherapyForm = lazy(() => 
+  import('../forms/PhysiotherapyForm').then(module => ({ default: module.PhysiotherapyForm }))
+);
 
 // Tipos para las props del Dispatcher
 export interface AppointmentFormData {
