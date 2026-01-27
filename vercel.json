@@ -6,12 +6,14 @@
   "installCommand": "npm install",
   "outputDirectory": ".next",
   "regions": ["iad1"],
+  "engines": {
+    "node": "18.x"
+  },
   "functions": {
     "app/**/*.ts": {
       "maxDuration": 60
     }
   },
-  "runtime": "nodejs18.x",
   "headers": [
     {
       "source": "/(.*)",
