@@ -28,14 +28,14 @@ const PRIORITIES: { value: LabPriority; label: string }[] = [
 export default function LabAppointmentForm({ data, onChange }: LabAppointmentFormProps) {
   const labData = data as LaboratoryDepartmentData;
   const [formData, setFormData] = useState<LaboratoryDepartmentData>({
-    sampleType: 'blood',
-    tests: [],
-    priority: 'routine',
     ...labData,
+    sampleType: labData.sampleType || 'blood',
+    tests: labData.tests || [],
+    priority: labData.priority || 'routine',
   });
 
   useEffect(() => {
-    setFormData({ sampleType: 'blood', tests: [], priority: 'routine', ...labData });
+    setFormData({ ...labData });
   }, [labData]);
 
   const updateField = (field: keyof LaboratoryDepartmentData, value: unknown) => {

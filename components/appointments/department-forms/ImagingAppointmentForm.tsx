@@ -42,14 +42,14 @@ const CONTRAST_TYPES: { value: string; label: string }[] = [
 export default function ImagingAppointmentForm({ data, onChange }: ImagingAppointmentFormProps) {
   const imgData = data as ImagingDepartmentData;
   const [formData, setFormData] = useState<ImagingDepartmentData>({
-    imagingType: 'xray',
-    bodyPart: 'chest',
-    contrastRequired: false,
     ...imgData,
+    imagingType: imgData.imagingType || 'xray',
+    bodyPart: imgData.bodyPart || 'chest',
+    contrastRequired: imgData.contrastRequired ?? false,
   });
 
   useEffect(() => {
-    setFormData({ imagingType: 'xray', bodyPart: 'chest', contrastRequired: false, ...imgData });
+    setFormData({ ...imgData });
   }, [imgData]);
 
   const updateField = (field: keyof ImagingDepartmentData, value: unknown) => {

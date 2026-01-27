@@ -60,13 +60,13 @@ export default function GeneralAppointmentForm({ data, department, onChange }: G
   const visitTypes = VISIT_TYPES[department] || VISIT_TYPES.MG;
   
   const [formData, setFormData] = useState<Record<string, unknown>>({
-    visitType: visitTypes[0]?.value,
-    priority: 'routine',
     ...deptData,
+    visitType: (deptData.visitType as string) || visitTypes[0]?.value,
+    priority: (deptData.priority as string) || 'routine',
   });
 
   useEffect(() => {
-    setFormData({ visitType: visitTypes[0]?.value, priority: 'routine', ...deptData });
+    setFormData({ ...deptData });
   }, [deptData, visitTypes]);
 
   const updateField = (field: string, value: unknown) => {

@@ -56,13 +56,13 @@ const TECHNIQUES: { value: TherapyTechnique; label: string }[] = [
 export default function PhysioAppointmentForm({ data, onChange }: PhysioAppointmentFormProps) {
   const physioData = data as PhysiotherapyDepartmentData;
   const [formData, setFormData] = useState<PhysiotherapyDepartmentData>({
-    sessionType: 'treatment',
-    bodyRegion: [],
     ...physioData,
+    sessionType: physioData.sessionType || 'treatment',
+    bodyRegion: physioData.bodyRegion || [],
   });
 
   useEffect(() => {
-    setFormData({ sessionType: 'treatment', bodyRegion: [], ...physioData });
+    setFormData({ ...physioData });
   }, [physioData]);
 
   const updateField = (field: keyof PhysiotherapyDepartmentData, value: unknown) => {
