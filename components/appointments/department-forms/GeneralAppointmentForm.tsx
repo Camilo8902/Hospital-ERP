@@ -110,7 +110,7 @@ export default function GeneralAppointmentForm({ data, department, onChange }: G
             <label className="label mb-2">Motivo de Consulta</label>
             <input
               type="text"
-              value={formData.chiefComplaint || ''}
+              value={(formData.chiefComplaint as string) || ''}
               onChange={(e) => updateField('chiefComplaint', e.target.value)}
               className="input"
               placeholder="Ej: Dolor de cabeza, fiebre, chequeo anual..."
