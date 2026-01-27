@@ -7,7 +7,6 @@ import { ArrowLeft, Save, Loader2, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { 
   PatientSelector, 
-  DoctorSelector, 
   DateTimePicker
 } from '../shared';
 import { 

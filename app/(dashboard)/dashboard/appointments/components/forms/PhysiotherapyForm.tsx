@@ -7,7 +7,6 @@ import { ArrowLeft, Save, Loader2, Calendar, Activity, FileText, AlertCircle } f
 import Link from 'next/link';
 import {
   PatientSelector,
-  DoctorSelector,
   DateTimePicker,
 } from '../shared';
 import { AppointmentFormDispatcherProps } from '../dispatcher/AppointmentFormDispatcher';
