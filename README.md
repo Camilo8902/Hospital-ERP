@@ -2,7 +2,72 @@
 
 MediCore ERP es un sistema integral de gestión hospitalaria desarrollado con Next.js 14 y Supabase. Permite gestionar pacientes, citas médicas, historia clínica electrónica, inventario de farmacia y facturación.
 
-## Características Principales
+## 🚀 Despliegue en Vercel
+
+### Requisitos Previos
+
+- Cuenta de [Vercel](https://vercel.com)
+- Cuenta de [Supabase](https://supabase.com)
+- Node.js 18.x o superior
+
+### Pasos para Desplegar en Vercel
+
+#### 1. Preparar el Proyecto
+
+```bash
+# Clonar el repositorio
+git clone <tu-repo-url>
+cd medicore-erp
+
+# Instalar dependencias
+npm install
+```
+
+#### 2. Configurar Variables de Entorno
+
+Crear archivo `.env.local` con tus credenciales de Supabase:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=tu_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_supabase_anon_key
+```
+
+#### 3. Conectar a Vercel
+
+```bash
+# Instalar Vercel CLI
+npm i -g vercel
+
+# Iniciar sesión
+vercel login
+
+# Deploy
+vercel
+```
+
+O desde la web de Vercel:
+1. Ir a [Vercel Dashboard](https://vercel.com/dashboard)
+2. Click en "Add New Project"
+3. Importar tu repositorio de Git
+4. Configurar las variables de entorno:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+5. Click en "Deploy"
+
+#### 4. Configurar Supabase para Producción
+
+En tu proyecto de Supabase:
+1. Ir a **Settings** → **API**
+2. Agregar tu dominio de Vercel a **Allowed Callback URLs**
+3. Agregar tu dominio de Vercel a **Allowed Redirect URLs**
+
+### Despliegue Automático
+
+Cada vez que hagas push a la rama principal, Vercel redeployará automáticamente.
+
+---
+
+## 🏥 Características Principales
 
 ### Gestión de Pacientes
 - Registro completo de pacientes con información demográfica y médica
@@ -24,6 +89,13 @@ MediCore ERP es un sistema integral de gestión hospitalaria desarrollado con Ne
 - Estados: Programada, En Proceso, Completada, Cancelada
 - Recordatorios automáticos
 
+### Módulo de Fisioterapia
+- Evaluación inicial completa (5 pasos)
+- Dashboard con estadísticas
+- Sesiones de tratamiento con notas SOAP
+- Protocolos clínicos basados en evidencia
+- Consentimientos informados digitales
+
 ### Farmacia e Inventario
 - Control de inventario de medicamentos e insumos
 - Alertas de stock bajo
@@ -43,97 +115,63 @@ MediCore ERP es un sistema integral de gestión hospitalaria desarrollado con Ne
 - **Recepción**: Gestión de pacientes y citas
 - **Farmacéutico**: Inventario y dispensación de recetas
 
-## Stack Tecnológico
+## 🛠️ Stack Tecnológico
 
 - **Frontend**: Next.js 14 (App Router), React, Tailwind CSS
 - **Backend**: Supabase (PostgreSQL, Auth, Storage)
-- **Despliegue**: Netlify
 - **UI Components**: Lucide React, Custom Components
 - **Language**: TypeScript
+- **Deployment**: Vercel
 
-## Requisitos Previos
+## 📁 Estructura del Proyecto
 
-- Node.js 18.x o superior
-- Cuenta de Supabase
-- Cuenta de Netlify
+```
+medicore-erp/
+├── app/
+│   ├── (auth)/              # Páginas de autenticación
+│   ├── (dashboard)/         # Páginas protegidas
+│   │   ├── dashboard/
+│   │   │   ├── patients/    # Módulo de pacientes
+│   │   │   ├── appointments/# Módulo de citas
+│   │   │   ├── physiotherapy/# Módulo de fisioterapia
+│   │   │   ├── pharmacy/    # Módulo de farmacia
+│   │   │   ├── lab/         # Módulo de laboratorio
+│   │   │   └── billing/     # Módulo de facturación
+│   ├── api/                 # API routes
+│   └── globals.css          # Estilos globales
+├── components/              # Componentes reutilizables
+├── lib/                     # Utilidades y configuraciones
+│   ├── supabase/            # Clientes de Supabase
+│   ├── types/               # Tipos TypeScript
+│   └── actions/             # Server Actions
+├── supabase/
+│   └── migrations/          # Migraciones de base de datos
+└── vercel.json              # Configuración de Vercel
+```
 
-## Instalación Local
-
-1. **Clonar el repositorio**
-   ```bash
-   cd medicore-erp
-   ```
-
-2. **Instalar dependencias**
-   ```bash
-   npm install
-   ```
-
-3. **Configurar variables de entorno**
-   ```bash
-   cp .env.example .env.local
-   ```
-
-4. **Editar .env.local con tus credenciales de Supabase**
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=tu_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_supabase_anon_key
-   ```
-
-5. **Ejecutar el servidor de desarrollo**
-   ```bash
-   npm run dev
-   ```
-
-6. **Abrir en el navegador**
-   ```
-   http://localhost:3000
-   ```
-
-## Configuración de Supabase
+## 🔧 Configuración de Supabase
 
 ### 1. Crear Proyecto
 1. Ve a [Supabase](https://supabase.com) y crea un nuevo proyecto
 2. Espera a que termine la configuración inicial
 
-### 2. Ejecutar Schema de Base de Datos
-1. En el panel de Supabase, ve a **SQL Editor**
-2. Copia el contenido del archivo `supabase/schema.sql`
+### 2. Ejecutar Migración de Base de Datos
+1. Ve a **SQL Editor** en Supabase
+2. Copia el contenido del archivo `supabase/migrations/20260127_physiotherapy_complete.sql`
 3. Ejecuta el script SQL
 
 ### 3. Configurar Auth
 1. Ve a **Authentication** → **Providers**
 2. Asegúrate de que Email esté habilitado
-3. Configura las políticas de Row Level Security (ya incluidas en el schema)
 
 ### 4. Obtener Credenciales
 1. Ve a **Settings** → **API**
 2. Copia la URL del proyecto y la Anon Key
-3. Agrégalas a tu archivo `.env.local`
+3. Agrégalas a las variables de entorno en Vercel
 
-## Despliegue en Netlify
+## 🔐 Credenciales de Prueba
 
-### 1. Preparar el Proyecto
-```bash
-npm run build
-```
-
-### 2. Conectar a Netlify
-1. Crea una cuenta en [Netlify](https://netlify.com)
-2. Conecta tu repositorio de Git
-3. Configura los comandos de build:
-   - Build command: `npm run build`
-   - Publish directory: `.next`
-4. Agrega las variables de entorno en Netlify:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-### 3. Desplegar
-Netlify detectará automáticamente la configuración de Next.js y desplegará tu aplicación.
-
-## Credenciales de Prueba
-
-Después de ejecutar el seed data, puedes usar las siguientes credenciales:
+Después de ejecutar la migración de seed data:
 
 | Rol | Email | Contraseña |
 |-----|-------|------------|
@@ -143,85 +181,27 @@ Después de ejecutar el seed data, puedes usar las siguientes credenciales:
 | Farmacéutico | pharmacy@medicore.com | pharmacy123 |
 | Enfermero | nurse@medicore.com | nurse123 |
 
-## Estructura del Proyecto
+## 📝 Scripts Disponibles
 
-```
-medicore-erp/
-├── app/
-│   ├── (auth)/              # Páginas de autenticación
-│   │   └── login/
-│   │       └── page.tsx     # Página de login
-│   ├── (dashboard)/         # Páginas protegidas
-│   │   ├── layout.tsx       # Layout del dashboard
-│   │   └── dashboard/
-│   │       ├── page.tsx     # Dashboard principal
-│   │       ├── patients/    # Módulo de pacientes
-│   │       ├── appointments/# Módulo de citas
-│   │       ├── pharmacy/    # Módulo de farmacia
-│   │       ├── inventory/   # Módulo de inventario
-│   │       └── billing/     # Módulo de facturación
-│   ├── globals.css          # Estilos globales
-│   └── layout.tsx           # Layout raíz
-├── components/
-│   ├── auth/                # Componentes de autenticación
-│   └── shared/              # Componentes compartidos
-├── lib/
-│   ├── supabase/
-│   │   ├── client.ts        # Cliente de Supabase (cliente)
-│   │   └── server.ts        # Cliente de Supabase (servidor)
-│   ├── types.ts             # Tipos TypeScript
-│   └── utils.ts             # Funciones de utilidad
-├── middleware.ts            # Middleware de autenticación
-└── supabase/
-    └── schema.sql           # Schema de base de datos
+```bash
+npm run dev      # Iniciar servidor de desarrollo
+npm run build    # Construir para producción
+npm run start    # Iniciar servidor de producción
+npm run lint     # Ejecutar linter
 ```
 
-## Personalización
+## 🤝 Contribución
 
-### Colores
-Edita `tailwind.config.js` para cambiar la paleta de colores:
-```javascript
-theme: {
-  extend: {
-    colors: {
-      primary: {
-        500: '#0ea5e9',  // Color principal
-      },
-    },
-  },
-}
-```
+1. Fork el repositorio
+2. Crea una rama para tu feature (`git checkout -b feature/amazing-feature`)
+3. Commit tus cambios (`git commit -m 'Add some amazing feature'`)
+4. Push a la rama (`git push origin feature/amazing-feature`)
+5. Abre un Pull Request
 
-### Roles
-Edita `lib/types.ts` para agregar o modificar roles:
-```typescript
-export type UserRole = 'admin' | 'doctor' | 'nurse' | 'reception' | 'pharmacy';
-```
-
-### Políticas RLS
-Edita `supabase/schema.sql` para modificar las políticas de seguridad.
-
-## Seguridad
-
-- **Row Level Security (RLS)**: Todas las tablas tienen políticas RLS activas
-- **Auditoría**: Cada modificación se registra en `audit_logs`
-- **Autenticación**: Tokens JWT con refresh automático
-- **Middleware**: Verificación de sesión en cada request
-
-## Próximas Mejoras
-
-- [ ] Notificaciones push
-- [ ] Integración con SMS para recordatorios
-- [ ] Reportes PDF/Excel
-- [ ] Dashboard de analíticas
-- [ ] Subida de archivos (imágenes, documentos)
-- [ ] API externa para integración
-- [ ] Multi-tenant support
-
-## Licencia
+## 📄 Licencia
 
 MIT License - Feel free to use for personal or commercial projects.
 
-## Soporte
+## 📞 Soporte
 
 Para preguntas o soporte, contacta al equipo de desarrollo.
