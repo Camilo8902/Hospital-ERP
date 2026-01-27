@@ -145,7 +145,7 @@ export default function GeneralAppointmentForm({ data, department, onChange }: G
       <div>
         <label className="label mb-2">Notas Adicionales</label>
         <textarea
-          value={formData.notes || ''}
+          value={(formData.notes as string) || ''}
           onChange={(e) => updateField('notes', e.target.value)}
           className="input min-h-[80px]"
           placeholder="Notas específicas para esta cita..."
