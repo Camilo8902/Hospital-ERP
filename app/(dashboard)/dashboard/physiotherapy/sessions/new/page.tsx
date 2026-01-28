@@ -18,12 +18,20 @@ import {
   Dumbbell,
   Settings,
   ChevronDown,
-  X
+  X,
+  Stethoscope
 } from 'lucide-react';
 import Link from 'next/link';
 import { getPhysioAppointmentById } from '@/lib/actions/physiotherapy';
 
 // Types for catalogs
+interface TreatmentType {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+}
+
 interface Technique {
   id: string;
   name: string;
@@ -54,7 +62,7 @@ interface Exercise {
 
 // Selected treatment with parameters
 interface SelectedTreatment {
-  type: 'technique' | 'equipment' | 'exercise';
+  type: 'treatment_type' | 'technique' | 'equipment' | 'exercise';
   id: string;
   name: string;
   duration_minutes: number;
@@ -86,6 +94,16 @@ async function fetchTechniques(): Promise<Technique[]> {
 async function fetchEquipment(): Promise<Equipment[]> {
   try {
     const res = await fetch('/api/physio-catalogs/equipment');
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+async function fetchTreatmentTypes(): Promise<TreatmentType[]> {
+  try {
+    const res = await fetch('/api/physio-catalogs/treatment-types');
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -126,6 +144,7 @@ export default function NewPhysioSessionForm() {
   const [isReassessment, setIsReassessment] = useState(false);
   
   // Catalog data
+  const [treatmentTypes, setTreatmentTypes] = useState<TreatmentType[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -135,9 +154,25 @@ export default function NewPhysioSessionForm() {
   
   // UI state
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
-  const [treatmentType, setTreatmentType] = useState<'technique' | 'equipment' | 'exercise'>('technique');
+  const [treatmentType, setTreatmentType] = useState<'treatment_type' | 'technique' | 'equipment' | 'exercise'>('treatment_type');
 
-  const [formData, setFormData] = useState({
+  interface FormData {
+  session_date: string;
+  session_time: string;
+  duration_minutes: string;
+  pain_level: number;
+  pain_location: string;
+  body_region: string;
+  muscle_group: string;
+  muscle_strength_grade: number;
+  rom_affected: string;
+  subjective: string;
+  objective: string;
+  analysis: string;
+  plan: string;
+}
+
+const [formData, setFormData] = useState<FormData>({
     session_date: '',
     session_time: '',
     duration_minutes: '45',
@@ -157,11 +192,13 @@ export default function NewPhysioSessionForm() {
   useEffect(() => {
     async function loadCatalogs() {
       try {
-        const [t, e, ex] = await Promise.all([
+        const [tt, t, e, ex] = await Promise.all([
+          fetchTreatmentTypes(),
           fetchTechniques(),
           fetchEquipment(),
           fetchExercises()
         ]);
+        setTreatmentTypes(tt);
         setTechniques(t);
         setEquipment(e.filter(item => item.status === 'available'));
         setExercises(ex);
@@ -194,9 +231,9 @@ export default function NewPhysioSessionForm() {
     loadAppointmentData();
   }, [searchParams]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (e: any) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormData((prev: FormData) => ({
       ...prev,
       [name]: type === 'number' ? parseInt(value) || 0 : value,
     }));
@@ -226,21 +263,21 @@ export default function NewPhysioSessionForm() {
       notes: '',
     };
     
-    setSelectedTreatments(prev => [...prev, newTreatment]);
+    setSelectedTreatments((prev: SelectedTreatment[]) => [...prev, newTreatment]);
     setShowTreatmentModal(false);
   };
 
   const removeTreatment = (index: number) => {
-    setSelectedTreatments(prev => prev.filter((_, i) => i !== index));
+    setSelectedTreatments((prev: SelectedTreatment[]) => prev.filter((_, i) => i !== index));
   };
 
   const updateTreatment = (index: number, updates: Partial<SelectedTreatment>) => {
-    setSelectedTreatments(prev => prev.map((t, i) => 
+    setSelectedTreatments((prev: SelectedTreatment[]) => prev.map((t: SelectedTreatment, i: number) => 
       i === index ? { ...t, ...updates } : t
     ));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -252,7 +289,7 @@ export default function NewPhysioSessionForm() {
       }
 
       // Calculate total duration from treatments
-      const totalTreatmentDuration = selectedTreatments.reduce((sum, t) => sum + t.duration_minutes, 0);
+      const totalTreatmentDuration = selectedTreatments.reduce((sum: number, t: SelectedTreatment) => sum + t.duration_minutes, 0);
       const finalDuration = totalTreatmentDuration > 0 ? totalTreatmentDuration : parseInt(formData.duration_minutes);
 
       // Create session with treatments as JSON
@@ -273,9 +310,9 @@ export default function NewPhysioSessionForm() {
           muscle_group: formData.muscle_group,
           muscle_strength_grade: formData.muscle_strength_grade,
           rom_affected: formData.rom_affected,
-          techniques_applied: selectedTreatments.filter(t => t.type === 'technique').map(t => t.name),
-          exercises_applied: selectedTreatments.filter(t => t.type === 'exercise').map(t => t.name),
-          equipment_used: selectedTreatments.filter(t => t.type === 'equipment').map(t => t.name),
+          techniques_applied: selectedTreatments.filter((t: SelectedTreatment) => t.type === 'technique').map((t: SelectedTreatment) => t.name),
+          exercises_applied: selectedTreatments.filter((t: SelectedTreatment) => t.type === 'exercise').map((t: SelectedTreatment) => t.name),
+          equipment_used: selectedTreatments.filter((t: SelectedTreatment) => t.type === 'equipment').map((t: SelectedTreatment) => t.name),
           treatments_detail: selectedTreatments,
           subjective: formData.subjective,
           objective: formData.objective,
