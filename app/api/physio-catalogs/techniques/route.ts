@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     
     let query = adminSupabase
       .from('physio_techniques')
-      .select('*, treatment_types(name)')
+      .select('*, physio_treatment_types(name)')
       .order('name');
     
     if (treatment_type_id) {
@@ -20,10 +20,11 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
     
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error('Supabase error:', error);
+      return NextResponse.json({ error: error.message, details: error }, { status: 400 });
     }
     
-    return NextResponse.json(data);
+    return NextResponse.json(data || []);
   } catch (error) {
     console.error('Error fetching techniques:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

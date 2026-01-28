@@ -7,14 +7,15 @@ export async function GET() {
     
     const { data, error } = await adminSupabase
       .from('physio_equipment')
-      .select('*, treatment_types(name)')
+      .select('*, physio_treatment_types(name)')
       .order('name');
     
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error('Supabase error:', error);
+      return NextResponse.json({ error: error.message, details: error }, { status: 400 });
     }
     
-    return NextResponse.json(data);
+    return NextResponse.json(data || []);
   } catch (error) {
     console.error('Error fetching equipment:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
