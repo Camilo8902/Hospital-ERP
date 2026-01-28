@@ -590,20 +590,44 @@ export default function PhysioCatalogsPage() {
               )}
 
               {activeTab === 'techniques' && (
-                <div>
-                  <label className="label">Tipo de Tratamiento *</label>
-                  <select
-                    value={(formData.treatment_type_id as string) || ''}
-                    onChange={(e) => setFormData({ ...formData, treatment_type_id: e.target.value })}
-                    className="input"
-                    required
-                  >
-                    <option value="">Seleccionar...</option>
-                    {treatmentTypes.map((tt) => (
-                      <option key={tt.id} value={tt.id}>{tt.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Tipo de Tratamiento *</label>
+                      <select
+                        value={(formData.treatment_type_id as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, treatment_type_id: e.target.value })}
+                        className="input"
+                        required
+                      >
+                        <option value="">Seleccionar...</option>
+                        {treatmentTypes.map((tt) => (
+                          <option key={tt.id} value={tt.id}>{tt.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Duración por Defecto (min)</label>
+                      <input
+                        type="number"
+                        value={(formData.default_duration_minutes as number) || 15}
+                        onChange={(e) => setFormData({ ...formData, default_duration_minutes: parseInt(e.target.value) || 15 })}
+                        className="input"
+                        min="1"
+                        max="120"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      checked={(formData.is_active as boolean) !== false}
+                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                    />
+                    <label htmlFor="is_active">Técnica activa</label>
+                  </div>
+                </>
               )}
 
               {activeTab === 'equipment' && (
