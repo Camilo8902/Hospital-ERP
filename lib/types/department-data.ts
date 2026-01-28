@@ -145,7 +145,7 @@ export type LabSampleType =
   | 'blood' | 'urine' | 'stool' | 'tissue'
   | 'cerebrospinal_fluid' | 'synovial_fluid' | 'sputum' | 'other';
 
-export type LabPriority = 'routine' | 'urgent' | 'stat';
+export type LabPriority = 'routine' | 'urgent' | 'emergency';
 export type LabOrderStatus = 'pending' | 'sample_collected' | 'in_progress' | 'completed' | 'reviewed' | 'cancelled';
 
 export interface LabTestRequest {
