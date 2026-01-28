@@ -157,7 +157,7 @@ export default function PhysioCatalogsPage() {
   const handleOpenModal = (item?: TreatmentType | Technique | Equipment | Exercise) => {
     if (item) {
       setEditingItem(item);
-      setFormData(item);
+      setFormData(item as unknown as Record<string, unknown>);
     } else {
       setEditingItem(null);
       setFormData({});
