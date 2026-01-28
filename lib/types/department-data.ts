@@ -618,18 +618,6 @@ export function createDefaultDepartmentData<T extends DepartmentCode>(code: T): 
 }
 
 export default {
-  PhysiotherapyDepartmentData,
-  LaboratoryDepartmentData,
-  ImagingDepartmentData,
-  GeneralMedicineData,
-  SurgeryDepartmentData,
-  CardiologyDepartmentData,
-  PediatricsDepartmentData,
-  EmergencyDepartmentData,
-  OphthalmologyDepartmentData,
-  PsychologyDepartmentData,
-  NutritionDepartmentData,
-  DepartmentData,
   DEPARTMENT_SCHEMAS,
   validateDepartmentData,
   createDefaultDepartmentData,
