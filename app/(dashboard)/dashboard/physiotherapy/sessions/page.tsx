@@ -126,14 +126,14 @@ export default function PhysioSessionsList() {
         // Derivar estado de session_number
         const status = session.session_number && session.session_number > 0 ? 'completed' : 'scheduled';
         return {
-          id: session.id,
-          session_date: session.session_date,
-          session_time: session.session_time,
-          patient_id: session.patient_id,
-          patient_name: patient.full_name || patient.first_name + ' ' + patient.last_name || 'Paciente desconocido',
+          id: session.id || 'sin-id',
+          session_date: session.session_date || new Date().toISOString().split('T')[0],
+          session_time: session.session_time || '08:00:00',
+          patient_id: session.patient_id || '',
+          patient_name: patient.full_name || patient.first_name + ' ' + patient.last_name || 'Paciente未知',
           patient_dni: patient.dni || 'N/A',
-          therapist_id: session.therapist_id,
-          therapist_name: therapist.full_name || therapist.first_name + ' ' + therapist.last_name || 'Terapeuta desconocido',
+          therapist_id: session.therapist_id || '',
+          therapist_name: therapist.full_name || therapist.first_name + ' ' + therapist.last_name || 'Terapeuta未知',
           session_type: session.is_initial_session ? 'initial' : 'follow-up',
           status: status,
           pain_level: session.pain_level || 0,
