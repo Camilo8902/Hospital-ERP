@@ -46,6 +46,8 @@ export default function PhysioSessionsList() {
     setError(null);
 
     try {
+      console.log('[Sessions] Obteniendo sesiones de physio_sessions...');
+      
       // Consulta directa sin JOINs complejos - obtener datos básicos
       const { data: sessionsData, error: sessionsError } = await supabase
         .from('physio_sessions')
@@ -63,8 +65,23 @@ export default function PhysioSessionsList() {
         .order('session_date', { ascending: false })
         .limit(50);
 
+      console.log('[Sessions] Datos recibidos:', sessionsData?.length || 0, 'sesiones');
+      
       if (sessionsError) {
+        console.error('[Sessions] Error de Supabase:', sessionsError);
         throw sessionsError;
+      }
+
+      if (!sessionsData || sessionsData.length === 0) {
+        console.log('[Sessions] No hay sesiones en la tabla, verificando datos...');
+        // Verificar si hay datos de prueba
+        const { count } = await supabase
+          .from('physio_sessions')
+          .select('*', { count: 'exact', head: true });
+        console.log('[Sessions] Total de sesiones en tabla:', count);
+        setSessions([]);
+        setLoading(false);
+        return;
       }
 
       // Obtener pacientes y terapeutas por separado

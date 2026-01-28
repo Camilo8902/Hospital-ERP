@@ -300,6 +300,7 @@ export default function PhysiotherapyDashboard() {
 
       // Obtener sesiones recientes de fisioterapia
       try {
+        console.log('[Dashboard] Obteniendo sesiones recientes de physio_sessions...');
         const { data: recentSessionsData, error: recentSessionsError } = await supabase
           .from('physio_sessions')
           .select(`
@@ -315,10 +316,19 @@ export default function PhysiotherapyDashboard() {
           .order('session_date', { ascending: false })
           .limit(10);
 
+        console.log('[Dashboard] Sesiones recientes recibidas:', recentSessionsData?.length || 0);
+
+        if (recentSessionsError) {
+          console.error('[Dashboard] Error en recentSessions:', recentSessionsError);
+        }
+
         if (!recentSessionsError && recentSessionsData) {
           // Obtener pacientes y terapeutas por separado
           const recentPatientIds = Array.from(new Set(recentSessionsData.map((s: any) => s.patient_id).filter(Boolean)));
           const recentTherapistIds = Array.from(new Set(recentSessionsData.map((s: any) => s.therapist_id).filter(Boolean)));
+          
+          console.log('[Dashboard] IDs de pacientes únicos:', recentPatientIds.length);
+          console.log('[Dashboard] IDs de terapeutas únicos:', recentTherapistIds.length);
           
           let recentPatientMap: Record<string, any> = {};
           let recentTherapistMap: Record<string, any> = {};
@@ -654,150 +664,83 @@ export default function PhysiotherapyDashboard() {
             )}
           </div>
         </div>
-      {/* Recent Sessions */}
-      <div className="card">
-        <div className="card-header">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-orange-600" />
-              Sesiones Recientes
-            </h2>
-            <Link href="/dashboard/physiotherapy/sessions" className="text-sm text-orange-600 hover:text-orange-700">
-              Ver todas →
-            </Link>
-          </div>
-        </div>
-        <div className="card-body">
-          {recentSessions.length === 0 ? (
-            <div className="text-center py-6">
-              <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">No hay sesiones registradas</p>
-              <Link 
-                href="/dashboard/physiotherapy/sessions/new"
-                className="text-orange-600 hover:text-orange-700 font-medium mt-2 inline-block"
-              >
-                Registrar primera sesión
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {recentSessions.map((session) => (
-                <div 
-                  key={session.id}
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                  onClick={() => window.location.href = `/dashboard/physiotherapy/sessions`}
-                >
-                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                    <Activity className="w-5 h-5 text-orange-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{session.patient_name}</p>
-                    <p className="text-sm text-gray-500">
-                      {formatDate(session.session_date)} • {session.session_time.substring(0, 5)} • {session.therapist_name}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      session.status === 'completed' ? 'bg-green-100 text-green-700' :
-                      session.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                      session.status === 'scheduled' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {session.status === 'completed' ? 'Completada' :
-                       session.status === 'in_progress' ? 'En progreso' :
-                       session.status === 'scheduled' ? 'Programada' : session.status}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      Dolor: {session.pain_level}/10
-                    </span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
       </div>
 
-      {/* Recent Records */}
-      <div className="card">
-        <div className="card-header">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Stethoscope className="w-5 h-5 text-purple-600" />
-              Registros Clínicos Recientes
-            </h2>
-            <Link href="/dashboard/patients" className="text-sm text-purple-600 hover:text-purple-700">
-              Ver todos →
-            </Link>
-          </div>
-        </div>
-        <div className="card-body">
-          {recentRecords.length === 0 ? (
-            <div className="text-center py-8">
-              <Activity className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No hay registros de fisioterapia aún</p>
-              <Link 
-                href="/dashboard/physiotherapy/sessions/new"
-                className="text-purple-600 hover:text-purple-700 font-medium mt-2 inline-block"
-              >
-                Crear primer registro
+      {/* Recent Sessions - Full Width */}
+      <div className="w-full">
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-orange-600" />
+                Sesiones Recientes
+              </h2>
+              <Link href="/dashboard/physiotherapy/sessions" className="text-sm text-orange-600 hover:text-orange-700">
+                Ver todas →
               </Link>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Paciente</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Diagnóstico</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Fecha</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Estado</th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-500 text-sm">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentRecords.map((record) => (
-                    <tr key={record.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {(record.patients as any)?.full_name || 'Paciente desconocido'}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            DNI: {(record.patients as any)?.dni || 'N/A'}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <p className="text-gray-900 truncate max-w-xs">
-                          {record.clinical_diagnosis || record.chief_complaint || 'Sin diagnóstico'}
-                        </p>
-                      </td>
-                      <td className="py-3 px-4">
-                        <p className="text-gray-900">
-                          {new Date(record.created_at).toLocaleDateString('es-ES')}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {new Date(record.created_at).toLocaleTimeString('es-ES', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                        </p>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          record.status === 'active' 
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {record.status === 'active' ? 'Activo' : record.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <Link 
-                          href={`/dashboard/patients/${record.patient_id}/history`}
+          </div>
+          <div className="card-body">
+            {recentSessions.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">No hay sesiones registradas aún</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Fecha</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Hora</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Paciente</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">DNI</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Terapeuta</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Estado</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500 text-sm">Dolor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentSessions.map((session) => (
+                      <tr key={session.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4 text-gray-900">{formatDate(session.session_date)}</td>
+                        <td className="py-3 px-4 text-gray-900">{session.session_time.substring(0, 5)}</td>
+                        <td className="py-3 px-4 font-medium text-gray-900">{session.patient_name}</td>
+                        <td className="py-3 px-4 text-gray-500">{session.patient_dni}</td>
+                        <td className="py-3 px-4 text-gray-500">{session.therapist_name}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            session.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            session.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                            session.status === 'scheduled' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {session.status === 'completed' ? 'Completada' :
+                             session.status === 'in_progress' ? 'En progreso' :
+                             session.status === 'scheduled' ? 'Programada' : session.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+                            session.pain_level >= 7 ? 'bg-red-100 text-red-700' :
+                            session.pain_level >= 4 ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            {session.pain_level}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
                           className="text-purple-600 hover:text-purple-700 font-medium text-sm"
                         >
                           Ver historial
