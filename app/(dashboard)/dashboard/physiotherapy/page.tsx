@@ -173,8 +173,8 @@ export default function PhysiotherapyDashboard() {
 
       if (!recordsError && records) {
         // Obtener pacientes y terapeutas por separado
-        const patientIds = [...new Set(records.map(r => r.patient_id).filter(Boolean))];
-        const therapistIds = [...new Set(records.map(r => r.therapist_id).filter(Boolean))];
+        const patientIds = Array.from(new Set(records.map((r: any) => r.patient_id).filter(Boolean)));
+        const therapistIds = Array.from(new Set(records.map((r: any) => r.therapist_id).filter(Boolean)));
         
         let patientMap: Record<string, any> = {};
         let therapistMap: Record<string, any> = {};
@@ -237,8 +237,8 @@ export default function PhysiotherapyDashboard() {
 
       if (!appointmentsError && appointments) {
         // Obtener pacientes y terapeutas por separado
-        const patientIds = [...new Set(appointments.map(a => a.patient_id).filter(Boolean))];
-        const therapistIds = [...new Set(appointments.map(a => a.doctor_id).filter(Boolean))];
+        const patientIds = Array.from(new Set(appointments.map((a: any) => a.patient_id).filter(Boolean)));
+        const therapistIds = Array.from(new Set(appointments.map((a: any) => a.doctor_id).filter(Boolean)));
         
         let patientMap: Record<string, any> = {};
         let therapistMap: Record<string, any> = {};

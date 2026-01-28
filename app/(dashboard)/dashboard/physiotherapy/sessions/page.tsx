@@ -68,8 +68,8 @@ export default function PhysioSessionsList() {
       }
 
       // Obtener pacientes y terapeutas por separado
-      const patientIds = [...new Set(sessionsData?.map(s => s.patient_id).filter(Boolean) || [])];
-      const therapistIds = [...new Set(sessionsData?.map(s => s.therapist_id).filter(Boolean) || [])];
+      const patientIds = Array.from(new Set(sessionsData?.map((s: any) => s.patient_id).filter(Boolean) || []));
+      const therapistIds = Array.from(new Set(sessionsData?.map((s: any) => s.therapist_id).filter(Boolean) || []));
 
       let patientMap: Record<string, any> = {};
       let therapistMap: Record<string, any> = {};
