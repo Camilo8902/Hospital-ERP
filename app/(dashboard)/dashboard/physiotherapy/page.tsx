@@ -63,6 +63,18 @@ interface UpcomingSession {
   therapist_name: string;
 }
 
+interface RecentSession {
+  id: string;
+  session_date: string;
+  session_time: string;
+  patient_id: string;
+  patient_name: string;
+  patient_dni: string;
+  therapist_name: string;
+  status: string;
+  pain_level: number;
+}
+
 export default function PhysiotherapyDashboard() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
@@ -78,6 +90,7 @@ export default function PhysiotherapyDashboard() {
   });
   const [recentRecords, setRecentRecords] = useState<PhysioRecord[]>([]);
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
+  const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -283,6 +296,78 @@ export default function PhysiotherapyDashboard() {
           };
         });
         setUpcomingSessions(mappedSessions);
+      }
+
+      // Obtener sesiones recientes de fisioterapia
+      try {
+        const { data: recentSessionsData, error: recentSessionsError } = await supabase
+          .from('physio_sessions')
+          .select(`
+            id,
+            session_date,
+            session_time,
+            patient_id,
+            therapist_id,
+            status,
+            pain_level,
+            notes
+          `)
+          .order('session_date', { ascending: false })
+          .limit(10);
+
+        if (!recentSessionsError && recentSessionsData) {
+          // Obtener pacientes y terapeutas por separado
+          const recentPatientIds = Array.from(new Set(recentSessionsData.map((s: any) => s.patient_id).filter(Boolean)));
+          const recentTherapistIds = Array.from(new Set(recentSessionsData.map((s: any) => s.therapist_id).filter(Boolean)));
+          
+          let recentPatientMap: Record<string, any> = {};
+          let recentTherapistMap: Record<string, any> = {};
+          
+          if (recentPatientIds.length > 0) {
+            const { data: recentPatientsData } = await supabase
+              .from('patients')
+              .select('id, full_name, dni, first_name, last_name')
+              .in('id', recentPatientIds);
+            if (recentPatientsData) {
+              recentPatientMap = recentPatientsData.reduce<Record<string, any>>((acc, p) => {
+                acc[p.id] = p;
+                return acc;
+              }, {});
+            }
+          }
+          
+          if (recentTherapistIds.length > 0) {
+            const { data: recentTherapistsData } = await supabase
+              .from('profiles')
+              .select('id, full_name, first_name, last_name')
+              .in('id', recentTherapistIds);
+            if (recentTherapistsData) {
+              recentTherapistMap = recentTherapistsData.reduce<Record<string, any>>((acc, t) => {
+                acc[t.id] = t;
+                return acc;
+              }, {});
+            }
+          }
+          
+          const mappedRecentSessions: RecentSession[] = recentSessionsData.map((session: any) => {
+            const patient = recentPatientMap[session.patient_id] || {};
+            const therapist = recentTherapistMap[session.therapist_id] || {};
+            return {
+              id: session.id,
+              session_date: session.session_date,
+              session_time: session.session_time,
+              patient_id: session.patient_id,
+              patient_name: patient.full_name || patient.first_name + ' ' + patient.last_name || 'Paciente desconocido',
+              patient_dni: patient.dni || 'N/A',
+              therapist_name: therapist.full_name || therapist.first_name + ' ' + therapist.last_name || 'Por asignar',
+              status: session.status || 'completed',
+              pain_level: session.pain_level || 0,
+            };
+          });
+          setRecentSessions(mappedRecentSessions);
+        }
+      } catch (sessionsErr) {
+        console.error('Error fetching recent sessions:', sessionsErr);
       }
 
     } catch (err) {
@@ -569,6 +654,70 @@ export default function PhysiotherapyDashboard() {
             )}
           </div>
         </div>
+      {/* Recent Sessions */}
+      <div className="card">
+        <div className="card-header">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-orange-600" />
+              Sesiones Recientes
+            </h2>
+            <Link href="/dashboard/physiotherapy/sessions" className="text-sm text-orange-600 hover:text-orange-700">
+              Ver todas →
+            </Link>
+          </div>
+        </div>
+        <div className="card-body">
+          {recentSessions.length === 0 ? (
+            <div className="text-center py-6">
+              <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">No hay sesiones registradas</p>
+              <Link 
+                href="/dashboard/physiotherapy/sessions/new"
+                className="text-orange-600 hover:text-orange-700 font-medium mt-2 inline-block"
+              >
+                Registrar primera sesión
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentSessions.map((session) => (
+                <div 
+                  key={session.id}
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  onClick={() => window.location.href = `/dashboard/physiotherapy/sessions`}
+                >
+                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                    <Activity className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 truncate">{session.patient_name}</p>
+                    <p className="text-sm text-gray-500">
+                      {formatDate(session.session_date)} • {session.session_time.substring(0, 5)} • {session.therapist_name}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      session.status === 'completed' ? 'bg-green-100 text-green-700' :
+                      session.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                      session.status === 'scheduled' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {session.status === 'completed' ? 'Completada' :
+                       session.status === 'in_progress' ? 'En progreso' :
+                       session.status === 'scheduled' ? 'Programada' : session.status}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      Dolor: {session.pain_level}/10
+                    </span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
       </div>
 
       {/* Recent Records */}

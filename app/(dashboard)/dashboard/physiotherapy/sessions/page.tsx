@@ -55,10 +55,10 @@ export default function PhysioSessionsList() {
             session_time,
             patient_id,
             therapist_id,
-            session_type,
             status,
             pain_level,
-            techniques_applied
+            techniques_applied,
+            notes
           `)
         .order('session_date', { ascending: false })
         .limit(50);
