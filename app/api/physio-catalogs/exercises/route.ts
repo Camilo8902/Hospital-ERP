@@ -54,9 +54,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const adminSupabase = createAdminClient();
     
+    // Eliminar campos undefined o null
+    const sanitizedBody = Object.fromEntries(
+      Object.entries(body).filter(([_, v]) => v !== null && v !== undefined && v !== '')
+    );
+    
     const { data, error } = await adminSupabase
       .from('physio_exercises')
-      .insert(body)
+      .insert(sanitizedBody)
       .select()
       .single();
     

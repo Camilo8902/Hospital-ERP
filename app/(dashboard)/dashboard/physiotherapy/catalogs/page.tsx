@@ -213,7 +213,6 @@ export default function PhysioCatalogsPage() {
         const equipmentData = {
           code: formData.code || null,
           name: formData.name || 'Equipo sin nombre',
-          description: formData.description || null,
           brand: formData.brand || null,
           model: formData.model || null,
           serial_number: formData.serial_number || null,
@@ -224,7 +223,6 @@ export default function PhysioCatalogsPage() {
           last_maintenance_date: formData.last_maintenance_date || null,
           next_maintenance_date: formData.next_maintenance_date || null,
           is_active: formData.is_active !== false,
-          specifications: null,
         };
         
         console.log('Guardando equipo:', equipmentData);
@@ -389,27 +387,31 @@ export default function PhysioCatalogsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredTechniques.map((technique) => (
-                  <tr key={technique.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{technique.code}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{technique.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{technique.treatment_types?.name || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{technique.default_duration_minutes || '-'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`badge ${technique.is_active ? 'badge-success' : 'badge-danger'}`}>
-                        {technique.is_active ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleOpenModal(technique)}
-                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredTechniques.map((technique) => {
+                  // Buscar el nombre del tipo de tratamiento localmente
+                  const treatmentType = treatmentTypes.find(tt => tt.id === technique.treatment_type_id);
+                  return (
+                    <tr key={technique.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{technique.code}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{technique.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{treatmentType?.name || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{technique.default_duration_minutes || '-'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`badge ${technique.is_active ? 'badge-success' : 'badge-danger'}`}>
+                          {technique.is_active ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => handleOpenModal(technique)}
+                          className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

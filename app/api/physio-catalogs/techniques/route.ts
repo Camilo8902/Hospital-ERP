@@ -71,14 +71,20 @@ export async function POST(request: NextRequest) {
     // Eliminar campos de relaciones que no existen en la tabla
     const { physio_treatment_types, ...cleanBody } = body;
     
+    // Eliminar campos undefined o null
+    const sanitizedBody = Object.fromEntries(
+      Object.entries(cleanBody).filter(([_, v]) => v !== null && v !== undefined && v !== '')
+    );
+    
     const { data, error } = await adminSupabase
       .from('physio_techniques')
-      .insert(cleanBody)
+      .insert(sanitizedBody)
       .select()
       .single();
     
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error('Supabase insert error:', error);
+      return NextResponse.json({ error: error.message, details: error }, { status: 400 });
     }
     
     return NextResponse.json(data, { status: 201 });
