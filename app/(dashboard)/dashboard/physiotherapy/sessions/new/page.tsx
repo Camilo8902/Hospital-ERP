@@ -883,26 +883,24 @@ export default function NewPhysioSessionForm() {
                         </div>
                         <button
                           onClick={() => {
-                            const newTreatment = {
+                            const newTreatment: SelectedTreatment = {
                               id: crypto.randomUUID(),
                               treatmentTypeId: selectedTreatmentType.id,
                               treatmentTypeName: selectedTreatmentType.name,
-                              techniques: [],
+                              techniques: [{
+                                id: crypto.randomUUID(),
+                                elementType: 'technique' as const,
+                                elementId: t.id,
+                                name: t.name,
+                                duration_minutes: t.default_duration_minutes || 15,
+                                parameters: {},
+                                results: {},
+                                notes: '',
+                              }],
                               equipment: [],
                               exercises: [],
                               notes: '',
                             };
-                            // Agregar la técnica directamente
-                            newTreatment.techniques.push({
-                              id: crypto.randomUUID(),
-                              elementType: 'technique' as const,
-                              elementId: t.id,
-                              name: t.name,
-                              duration_minutes: t.default_duration_minutes || 15,
-                              parameters: {},
-                              results: {},
-                              notes: '',
-                            });
                             setSelectedTreatments(prev => [...prev, newTreatment]);
                             setShowTreatmentModal(false);
                           }}
@@ -921,25 +919,24 @@ export default function NewPhysioSessionForm() {
                         </div>
                         <button
                           onClick={() => {
-                            const newTreatment = {
+                            const newTreatment: SelectedTreatment = {
                               id: crypto.randomUUID(),
                               treatmentTypeId: selectedTreatmentType.id,
                               treatmentTypeName: selectedTreatmentType.name,
                               techniques: [],
-                              equipment: [],
+                              equipment: [{
+                                id: crypto.randomUUID(),
+                                elementType: 'equipment' as const,
+                                elementId: e.id,
+                                name: `${e.brand || ''} ${e.model || ''}`.trim() || e.name,
+                                duration_minutes: 10,
+                                parameters: {},
+                                results: {},
+                                notes: '',
+                              }],
                               exercises: [],
                               notes: '',
                             };
-                            newTreatment.equipment.push({
-                              id: crypto.randomUUID(),
-                              elementType: 'equipment' as const,
-                              elementId: e.id,
-                              name: `${e.brand || ''} ${e.model || ''}`.trim() || e.name,
-                              duration_minutes: 10,
-                              parameters: {},
-                              results: {},
-                              notes: '',
-                            });
                             setSelectedTreatments(prev => [...prev, newTreatment]);
                             setShowTreatmentModal(false);
                           }}
@@ -963,25 +960,24 @@ export default function NewPhysioSessionForm() {
                         </div>
                         <button
                           onClick={() => {
-                            const newTreatment = {
+                            const newTreatment: SelectedTreatment = {
                               id: crypto.randomUUID(),
                               treatmentTypeId: selectedTreatmentType.id,
                               treatmentTypeName: selectedTreatmentType.name,
                               techniques: [],
                               equipment: [],
-                              exercises: [],
+                              exercises: [{
+                                id: crypto.randomUUID(),
+                                elementType: 'exercise' as const,
+                                elementId: ex.id,
+                                name: ex.name,
+                                duration_minutes: 15,
+                                parameters: {},
+                                results: {},
+                                notes: '',
+                              }],
                               notes: '',
                             };
-                            newTreatment.exercises.push({
-                              id: crypto.randomUUID(),
-                              elementType: 'exercise' as const,
-                              elementId: ex.id,
-                              name: ex.name,
-                              duration_minutes: 15,
-                              parameters: {},
-                              results: {},
-                              notes: '',
-                            });
                             setSelectedTreatments(prev => [...prev, newTreatment]);
                             setShowTreatmentModal(false);
                           }}
