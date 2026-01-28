@@ -1,0 +1,605 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Search, 
+  Filter,
+  ChevronDown,
+  X,
+  Check,
+  AlertCircle,
+  Dumbbell,
+  FlaskConical,
+  Stethoscope,
+  Activity,
+  FileText,
+  Settings
+} from 'lucide-react';
+
+// Types
+interface TreatmentType {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  is_active: boolean;
+}
+
+interface Technique {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  treatment_type_id: string;
+  treatment_types?: { name: string };
+  default_duration_minutes: number | null;
+  is_active: boolean;
+}
+
+interface Equipment {
+  id: string;
+  code: string;
+  name: string;
+  brand: string | null;
+  model: string | null;
+  status: string;
+  location: string | null;
+  treatment_types?: { name: string };
+}
+
+interface Exercise {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  body_region: string | null;
+  difficulty_level: string | null;
+  target_muscle_group: string[] | null;
+}
+
+// API functions
+async function fetchTreatmentTypes(): Promise<TreatmentType[]> {
+  const res = await fetch('/api/physio-catalogs/treatment-types');
+  return res.json();
+}
+
+async function fetchTechniques(treatmentTypeId?: string): Promise<Technique[]> {
+  const url = treatmentTypeId 
+    ? `/api/physio-catalogs/techniques?treatment_type_id=${treatmentTypeId}`
+    : '/api/physio-catalogs/techniques';
+  const res = await fetch(url);
+  return res.json();
+}
+
+async function fetchEquipment(): Promise<Equipment[]> {
+  const res = await fetch('/api/physio-catalogs/equipment');
+  return res.json();
+}
+
+async function fetchExercises(): Promise<Exercise[]> {
+  const res = await fetch('/api/physio-catalogs/exercises');
+  return res.json();
+}
+
+export default function PhysioCatalogsPage() {
+  const [activeTab, setActiveTab] = useState<'treatments' | 'techniques' | 'equipment' | 'exercises'>('treatments');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<TreatmentType | Technique | Equipment | Exercise | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Data states
+  const [treatmentTypes, setTreatmentTypes] = useState<TreatmentType[]>([]);
+  const [techniques, setTechniques] = useState<Technique[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+
+  // Modal form state
+  const [formData, setFormData] = useState<Record<string, unknown>>({});
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    try {
+      setLoading(true);
+      const [tt, t, e, ex] = await Promise.all([
+        fetchTreatmentTypes(),
+        fetchTechniques(),
+        fetchEquipment(),
+        fetchExercises()
+      ]);
+      setTreatmentTypes(tt);
+      setTechniques(t);
+      setEquipment(e);
+      setExercises(ex);
+    } catch (err) {
+      setError('Error al cargar los catálogos');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const tabs = [
+    { id: 'treatments', label: 'Tipos de Tratamiento', icon: Stethoscope },
+    { id: 'techniques', label: 'Técnicas', icon: Activity },
+    { id: 'equipment', label: 'Equipos', icon: FlaskConical },
+    { id: 'exercises', label: 'Ejercicios', icon: Dumbbell },
+  ];
+
+  const filteredTreatmentTypes = treatmentTypes.filter(t => 
+    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredTechniques = techniques.filter(t =>
+    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredEquipment = equipment.filter(e =>
+    e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.brand?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredExercises = exercises.filter(ex =>
+    ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    ex.body_region?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleOpenModal = (item?: TreatmentType | Technique | Equipment | Exercise) => {
+    if (item) {
+      setEditingItem(item);
+      setFormData(item);
+    } else {
+      setEditingItem(null);
+      setFormData({});
+    }
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingItem(null);
+    setFormData({});
+  };
+
+  const handleSave = async () => {
+    // Implementar guardado según el tab activo
+    console.log('Guardando:', formData);
+    handleCloseModal();
+    loadData();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Catálogos de Fisioterapia</h1>
+          <p className="text-gray-500 mt-1">Administra tratamientos, técnicas, equipos y ejercicios</p>
+        </div>
+        <button
+          onClick={() => handleOpenModal()}
+          className="btn btn-primary flex items-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          Nuevo {activeTab === 'treatments' ? 'Tratamiento' : activeTab === 'techniques' ? 'Técnica' : activeTab === 'equipment' ? 'Equipo' : 'Ejercicio'}
+        </button>
+      </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-4">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === tab.id
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder={`Buscar ${tabs.find(t => t.id === activeTab)?.label.toLowerCase()}...`}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="input pl-10"
+        />
+      </div>
+
+      {/* Content */}
+      <div className="card">
+        {activeTab === 'treatments' && (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredTreatmentTypes.map((treatment) => (
+                  <tr key={treatment.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{treatment.code}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{treatment.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{treatment.category || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${treatment.is_active ? 'badge-success' : 'badge-danger'}`}>
+                        {treatment.is_active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleOpenModal(treatment)}
+                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === 'techniques' && (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo de Tratamiento</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duración (min)</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredTechniques.map((technique) => (
+                  <tr key={technique.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{technique.code}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{technique.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{technique.treatment_types?.name || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{technique.default_duration_minutes || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${technique.is_active ? 'badge-success' : 'badge-danger'}`}>
+                        {technique.is_active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleOpenModal(technique)}
+                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === 'equipment' && (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marca/Modelo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ubicación</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredEquipment.map((eq) => (
+                  <tr key={eq.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{eq.code}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{eq.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {eq.brand && eq.model ? `${eq.brand} ${eq.model}` : eq.brand || eq.model || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{eq.location || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${
+                        eq.status === 'available' ? 'badge-success' :
+                        eq.status === 'in_use' ? 'badge-warning' :
+                        eq.status === 'maintenance' ? 'badge-info' :
+                        'badge-danger'
+                      }`}>
+                        {eq.status === 'available' ? 'Disponible' :
+                         eq.status === 'in_use' ? 'En uso' :
+                         eq.status === 'maintenance' ? 'Mantenimiento' :
+                         'Fuera de servicio'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleOpenModal(eq)}
+                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === 'exercises' && (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Región Corporal</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grupo Muscular</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dificultad</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredExercises.map((exercise) => (
+                  <tr key={exercise.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{exercise.code}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{exercise.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{exercise.body_region || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {exercise.target_muscle_group?.join(', ') || '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${
+                        exercise.difficulty_level === 'beginner' ? 'badge-success' :
+                        exercise.difficulty_level === 'intermediate' ? 'badge-warning' :
+                        'badge-danger'
+                      }`}>
+                        {exercise.difficulty_level === 'beginner' ? 'Básico' :
+                         exercise.difficulty_level === 'intermediate' ? 'Intermedio' :
+                         'Avanzado'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleOpenModal(exercise)}
+                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {((activeTab === 'treatments' && filteredTreatmentTypes.length === 0) ||
+          (activeTab === 'techniques' && filteredTechniques.length === 0) ||
+          (activeTab === 'equipment' && filteredEquipment.length === 0) ||
+          (activeTab === 'exercises' && filteredExercises.length === 0)) && (
+          <div className="text-center py-12">
+            <FileText className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-500">No hay registros encontrados</p>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">
+                {editingItem ? 'Editar' : 'Nuevo'} {activeTab === 'treatments' ? 'Tratamiento' : activeTab === 'techniques' ? 'Técnica' : activeTab === 'equipment' ? 'Equipo' : 'Ejercicio'}
+              </h2>
+              <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Form fields based on tab */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Código *</label>
+                  <input
+                    type="text"
+                    value={(formData.code as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    className="input"
+                    placeholder="Código único"
+                  />
+                </div>
+                <div>
+                  <label className="label">Nombre *</label>
+                  <input
+                    type="text"
+                    value={(formData.name as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="input"
+                    placeholder="Nombre"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Descripción</label>
+                <textarea
+                  value={(formData.description as string) || ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="input min-h-[100px]"
+                  placeholder="Descripción detallada"
+                />
+              </div>
+
+              {activeTab === 'treatments' && (
+                <div>
+                  <label className="label">Categoría</label>
+                  <select
+                    value={(formData.category as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="input"
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="thermal">Térmico</option>
+                    <option value="electrical">Eléctrico</option>
+                    <option value="mechanical">Mecánico</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </div>
+              )}
+
+              {activeTab === 'equipment' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Marca</label>
+                      <input
+                        type="text"
+                        value={(formData.brand as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                        className="input"
+                        placeholder="Marca"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Modelo</label>
+                      <input
+                        type="text"
+                        value={(formData.model as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                        className="input"
+                        placeholder="Modelo"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Ubicación</label>
+                      <input
+                        type="text"
+                        value={(formData.location as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        className="input"
+                        placeholder="Ubicación"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Estado</label>
+                      <select
+                        value={(formData.status as string) || 'available'}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                        className="input"
+                      >
+                        <option value="available">Disponible</option>
+                        <option value="in_use">En uso</option>
+                        <option value="maintenance">Mantenimiento</option>
+                        <option value="out_of_service">Fuera de servicio</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'exercises' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Región Corporal</label>
+                      <select
+                        value={(formData.body_region as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, body_region: e.target.value })}
+                        className="input"
+                      >
+                        <option value="">Seleccionar...</option>
+                        <option value="cervical">Cervical</option>
+                        <option value="lumbar">Lumbar</option>
+                        <option value="shoulder">Hombro</option>
+                        <option value="knee">Rodilla</option>
+                        <option value="hip">Cadera</option>
+                        <option value="ankle">Tobillo</option>
+                        <option value="elbow">Codo</option>
+                        <option value="wrist">Muñeca</option>
+                        <option value="full_body">Cuerpo completo</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Dificultad</label>
+                      <select
+                        value={(formData.difficulty_level as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, difficulty_level: e.target.value })}
+                        className="input"
+                      >
+                        <option value="">Seleccionar...</option>
+                        <option value="beginner">Básico</option>
+                        <option value="intermediate">Intermedio</option>
+                        <option value="advanced">Avanzado</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 p-4 border-t bg-gray-50">
+              <button onClick={handleCloseModal} className="btn btn-secondary">
+                Cancelar
+              </button>
+              <button onClick={handleSave} className="btn btn-primary flex items-center gap-2">
+                <Check className="w-4 h-4" />
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -17,7 +17,8 @@ import {
   AlertCircle,
   Stethoscope,
   Target,
-  Award
+  Award,
+  Settings
 } from 'lucide-react';
 
 interface PhysioStats {
@@ -430,6 +431,22 @@ export default function PhysiotherapyDashboard() {
               <div>
                 <h3 className="font-semibold text-gray-900">Historial de Sesiones</h3>
                 <p className="text-sm text-gray-500">Ver todas las sesiones</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
+            </div>
+          </Link>
+
+          <Link 
+            href="/dashboard/physiotherapy/catalogs"
+            className="card hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-cyan-500"
+          >
+            <div className="card-body flex items-center gap-4">
+              <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center">
+                <Settings className="w-6 h-6 text-cyan-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Catálogos</h3>
+                <p className="text-sm text-gray-500">Tratamientos, equipos, ejercicios</p>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
             </div>
