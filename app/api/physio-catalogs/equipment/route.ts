@@ -7,7 +7,7 @@ export async function GET() {
     
     const { data, error } = await adminSupabase
       .from('physio_equipment')
-      .select('*, physio_treatment_types(name)')
+      .select('*')
       .order('name');
     
     if (error) {
@@ -37,15 +37,13 @@ export async function PUT(request: NextRequest) {
     const { data, error } = await adminSupabase
       .from('physio_equipment')
       .update(body)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
     
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     
-    return NextResponse.json(data);
+    return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error updating equipment:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

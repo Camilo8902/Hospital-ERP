@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     
     let query = adminSupabase
       .from('physio_techniques')
-      .select('*, physio_treatment_types(name)')
+      .select('*')
       .order('name');
     
     if (treatment_type_id) {
@@ -43,18 +43,20 @@ export async function PUT(request: NextRequest) {
     
     const adminSupabase = createAdminClient();
     
-    const { data, error } = await adminSupabase
-      .from('physio_techniques')
-      .update(body)
-      .eq('id', id)
-      .select()
-      .single();
+    // Eliminar campos de relaciones que no existen en la tabla
+    const { physio_treatment_types, ...cleanBody } = body;
     
+    // Solo actualizar campos que existen (sin select para evitar joins)
+    const { error } = await adminSupabase
+      .from('physio_techniques')
+      .update(cleanBody)
+      .eq('id', id);
+
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     
-    return NextResponse.json(data);
+    return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error updating technique:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

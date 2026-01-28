@@ -36,15 +36,13 @@ export async function PUT(request: NextRequest) {
     const { data, error } = await adminSupabase
       .from('physio_exercises')
       .update(body)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
     
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     
-    return NextResponse.json(data);
+    return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error updating exercise:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
