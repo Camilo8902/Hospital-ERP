@@ -17,20 +17,29 @@ export default function LoginForm() {
     setLoading(true);
     setError(null);
 
+    console.log('Intentando login con:', email);
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      console.log('Respuesta de Supabase:', { data, error });
+
       if (error) {
         setError(error.message);
+        console.error('Error de Supabase:', error);
         return;
       }
 
-      router.push('/dashboard');
-      router.refresh();
+      if (data.session) {
+        console.log('Login exitoso, redirigiendo...');
+        router.push('/dashboard');
+        router.refresh();
+      }
     } catch (err) {
+      console.error('Error inesperado:', err);
       setError('Ocurrió un error inesperado. Por favor, intenta de nuevo.');
     } finally {
       setLoading(false);
