@@ -175,6 +175,7 @@ export default function PhysioCatalogsPage() {
     try {
       setLoading(true);
       let success = false;
+      let errorMessage = '';
       
       if (activeTab === 'treatments') {
         const endpoint = editingItem ? `/api/physio-catalogs/treatment-types?id=${editingItem.id}` : '/api/physio-catalogs/treatment-types';
@@ -184,7 +185,12 @@ export default function PhysioCatalogsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
-        success = res.ok;
+        if (!res.ok) {
+          const errorData = await res.json();
+          errorMessage = errorData.error || 'Error desconocido';
+        } else {
+          success = true;
+        }
       } else if (activeTab === 'techniques') {
         const endpoint = editingItem ? `/api/physio-catalogs/techniques?id=${editingItem.id}` : '/api/physio-catalogs/techniques';
         const method = editingItem ? 'PUT' : 'POST';
@@ -193,16 +199,28 @@ export default function PhysioCatalogsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
-        success = res.ok;
+        if (!res.ok) {
+          const errorData = await res.json();
+          errorMessage = errorData.error || 'Error desconocido';
+        } else {
+          success = true;
+        }
       } else if (activeTab === 'equipment') {
         const endpoint = editingItem ? `/api/physio-catalogs/equipment?id=${editingItem.id}` : '/api/physio-catalogs/equipment';
         const method = editingItem ? 'PUT' : 'POST';
+        console.log('Guardando equipo:', formData);
         const res = await fetch(endpoint, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
-        success = res.ok;
+        if (!res.ok) {
+          const errorData = await res.json();
+          errorMessage = errorData.error || 'Error desconocido';
+          console.error('Error guardando equipo:', errorData);
+        } else {
+          success = true;
+        }
       } else if (activeTab === 'exercises') {
         const endpoint = editingItem ? `/api/physio-catalogs/exercises?id=${editingItem.id}` : '/api/physio-catalogs/exercises';
         const method = editingItem ? 'PUT' : 'POST';
@@ -211,14 +229,19 @@ export default function PhysioCatalogsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
-        success = res.ok;
+        if (!res.ok) {
+          const errorData = await res.json();
+          errorMessage = errorData.error || 'Error desconocido';
+        } else {
+          success = true;
+        }
       }
       
       if (success) {
-        await loadData(); // Refresh data after save
+        await loadData();
         handleCloseModal();
       } else {
-        setError('Error al guardar el elemento');
+        setError('Error al guardar: ' + errorMessage);
       }
     } catch (err) {
       setError('Error al guardar: ' + (err instanceof Error ? err.message : 'Error desconocido'));
@@ -543,6 +566,23 @@ export default function PhysioCatalogsPage() {
                     <option value="electrical">Eléctrico</option>
                     <option value="mechanical">Mecánico</option>
                     <option value="manual">Manual</option>
+                  </select>
+                </div>
+              )}
+
+              {activeTab === 'techniques' && (
+                <div>
+                  <label className="label">Tipo de Tratamiento *</label>
+                  <select
+                    value={(formData.treatment_type_id as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, treatment_type_id: e.target.value })}
+                    className="input"
+                    required
+                  >
+                    <option value="">Seleccionar...</option>
+                    {treatmentTypes.map((tt) => (
+                      <option key={tt.id} value={tt.id}>{tt.name}</option>
+                    ))}
                   </select>
                 </div>
               )}
