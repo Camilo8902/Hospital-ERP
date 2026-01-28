@@ -175,18 +175,28 @@ export interface PhysioSessionsFilter {
   sessionType?: string;
   bodyRegion?: string;
   searchTerm?: string;
+  offset?: number;
+  limit?: number;
 }
 
 // Estadísticas del dashboard de fisioterapia
 export interface PhysioDashboardStats {
-  activePatients: number;
-  sessionsThisMonth: number;
-  sessionsThisWeek: number;
-  averagePainReduction: number;
-  pendingAppointments: number;
-  completedSessionsToday: number;
-  averageSessionDuration: number;
-  patientSatisfaction: number;
+  active_patients?: number;
+  sessions_this_month?: number;
+  sessions_this_week?: number;
+  average_pain_reduction?: number;
+  pending_appointments?: number;
+  completed_sessions_today?: number;
+  average_session_duration?: number;
+  patient_satisfaction?: number;
+  activePatients?: number;
+  sessionsThisMonth?: number;
+  sessionsThisWeek?: number;
+  averagePainReduction?: number;
+  pendingAppointments?: number;
+  completedSessionsToday?: number;
+  averageSessionDuration?: number;
+  patientSatisfaction?: number;
   sessionsByStatus?: Record<string, number>;
   sessionsByTechnique?: Record<string, number>;
   painTrend?: Array<{ date: string; averagePain: number }>;
@@ -385,3 +395,50 @@ export const MUSCLE_STRENGTH_GRADES = [
   { value: 4, label: '4 - Movimiento contra resistencia', description: 'Movimiento contra resistencia moderada' },
   { value: 5, label: '5 - Fuerza normal', description: 'Movimiento contra resistencia completa' },
 ] as const;
+
+// Elemento de lista de sesiones (para UI)
+export interface PhysioSessionListItem {
+  id: string;
+  session_number?: number;
+  session_date: string;
+  session_time: string;
+  patient_id: string;
+  patient_name?: string;
+  therapist_id: string;
+  therapist_name?: string;
+  pain_level?: number;
+  techniques_applied?: string[];
+  status: string;
+  is_initial_session?: boolean;
+  duration_minutes?: number;
+}
+
+// Formulario de sesión de fisioterapia (para creación/actualización)
+export interface PhysioSessionForm {
+  appointment_id?: string;
+  medical_record_id?: string;
+  patient_id: string;
+  therapist_id: string;
+  session_number?: number;
+  session_date: string;
+  session_time: string;
+  duration_minutes?: number;
+  is_initial_session?: boolean;
+  is_reassessment?: boolean;
+  subjective?: string;
+  objective?: string;
+  analysis?: string;
+  plan?: string;
+  pain_level?: number;
+  pain_location?: string;
+  pain_type?: string;
+  body_region?: string;
+  muscle_group?: string;
+  muscle_strength_grade?: number;
+  rom_affected?: string;
+  modality?: string;
+  techniques_applied?: string[];
+  functional_score?: number;
+  notes?: string;
+  status?: string;
+}
