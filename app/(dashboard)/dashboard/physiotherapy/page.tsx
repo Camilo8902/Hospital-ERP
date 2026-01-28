@@ -154,7 +154,7 @@ export default function PhysiotherapyDashboard() {
         patientSatisfaction: 4.5, // Valor por defecto
       });
 
-      // Obtener registros recientes
+      // Obtener registros recientes (sin JOINs complejos)
       const { data: records, error: recordsError } = await supabase
         .from('physio_medical_records')
         .select(`
@@ -165,19 +165,60 @@ export default function PhysiotherapyDashboard() {
           chief_complaint,
           clinical_diagnosis,
           status,
-          created_at,
-          patients!inner(id, full_name, dni, phone),
-          therapists!inner(id, full_name)
+          created_at
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (!recordsError && records) {
-        setRecentRecords(records as unknown as PhysioRecord[]);
+        // Obtener pacientes y terapeutas por separado
+        const patientIds = [...new Set(records.map(r => r.patient_id).filter(Boolean))];
+        const therapistIds = [...new Set(records.map(r => r.therapist_id).filter(Boolean))];
+        
+        let patientMap: Record<string, any> = {};
+        let therapistMap: Record<string, any> = {};
+        
+        if (patientIds.length > 0) {
+          const { data: patientsData } = await supabase
+            .from('patients')
+            .select('id, full_name, dni, phone, first_name, last_name')
+            .in('id', patientIds);
+          if (patientsData) {
+            patientMap = patientsData.reduce((acc: Record<string, any>, p) => {
+              acc[p.id] = p;
+              return acc;
+            }, {});
+          }
+        }
+        
+        if (therapistIds.length > 0) {
+          const { data: therapistsData } = await supabase
+            .from('profiles')
+            .select('id, full_name, first_name, last_name')
+            .in('id', therapistIds);
+          if (therapistsData) {
+            therapistMap = therapistsData.reduce((acc: Record<string, any>, t) => {
+              acc[t.id] = t;
+              return acc;
+            }, {});
+          }
+        }
+        
+        const mappedRecords = records.map((record: any) => {
+          const patient = patientMap[record.patient_id] || {};
+          const therapist = therapistMap[record.therapist_id] || {};
+          return {
+            ...record,
+            patients: patient,
+            therapists: therapist,
+          };
+        });
+        
+        setRecentRecords(mappedRecords as unknown as PhysioRecord[]);
       }
 
-      // Obtener próximas sesiones
+      // Obtener próximas sesiones (sin JOINs complejos)
       const { data: appointments, error: appointmentsError } = await supabase
         .from('appointments')
         .select(`
@@ -186,8 +227,7 @@ export default function PhysiotherapyDashboard() {
           patient_id,
           doctor_id,
           appointment_type,
-          patients!inner(id, full_name, dni),
-          profiles!inner(id, full_name)
+          status
         `)
         .eq('appointment_type', 'physiotherapy')
         .eq('status', 'scheduled')
@@ -196,15 +236,52 @@ export default function PhysiotherapyDashboard() {
         .limit(5);
 
       if (!appointmentsError && appointments) {
-        const mappedSessions: UpcomingSession[] = appointments.map((apt: any) => ({
-          id: apt.id,
-          session_date: apt.start_time.split('T')[0],
-          session_time: apt.start_time.split('T')[1].substring(0, 5),
-          patient_name: apt.patients?.full_name || 'Paciente desconocido',
-          patient_dni: apt.patients?.dni || 'N/A',
-          session_type: 'treatment',
-          therapist_name: apt.profiles?.full_name || 'Por asignar',
-        }));
+        // Obtener pacientes y terapeutas por separado
+        const patientIds = [...new Set(appointments.map(a => a.patient_id).filter(Boolean))];
+        const therapistIds = [...new Set(appointments.map(a => a.doctor_id).filter(Boolean))];
+        
+        let patientMap: Record<string, any> = {};
+        let therapistMap: Record<string, any> = {};
+        
+        if (patientIds.length > 0) {
+          const { data: patientsData } = await supabase
+            .from('patients')
+            .select('id, full_name, dni, first_name, last_name')
+            .in('id', patientIds);
+          if (patientsData) {
+            patientMap = patientsData.reduce((acc: Record<string, any>, p) => {
+              acc[p.id] = p;
+              return acc;
+            }, {});
+          }
+        }
+        
+        if (therapistIds.length > 0) {
+          const { data: therapistsData } = await supabase
+            .from('profiles')
+            .select('id, full_name, first_name, last_name')
+            .in('id', therapistIds);
+          if (therapistsData) {
+            therapistMap = therapistsData.reduce((acc: Record<string, any>, t) => {
+              acc[t.id] = t;
+              return acc;
+            }, {});
+          }
+        }
+        
+        const mappedSessions: UpcomingSession[] = appointments.map((apt: any) => {
+          const patient = patientMap[apt.patient_id] || {};
+          const therapist = therapistMap[apt.doctor_id] || {};
+          return {
+            id: apt.id,
+            session_date: apt.start_time.split('T')[0],
+            session_time: apt.start_time.split('T')[1].substring(0, 5),
+            patient_name: patient.full_name || patient.first_name + ' ' + patient.last_name || 'Paciente desconocido',
+            patient_dni: patient.dni || 'N/A',
+            session_type: 'treatment',
+            therapist_name: therapist.full_name || therapist.first_name + ' ' + therapist.last_name || 'Por asignar',
+          };
+        });
         setUpcomingSessions(mappedSessions);
       }
 

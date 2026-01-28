@@ -46,16 +46,10 @@ export default function PhysioSessionsList() {
     setError(null);
 
     try {
-      // Intentar usar la función RPC primero
-      const { data, error: rpcError } = await supabase
-        .rpc('get_recent_physio_sessions', { limit_count: 50 });
-
-      if (rpcError) {
-        console.warn('RPC not available, falling back to direct query');
-        // Fallback a consulta directa si la RPC no existe
-        const { data: directData, error: directError } = await supabase
-          .from('physio_sessions')
-          .select(`
+      // Consulta directa sin JOINs complejos - obtener datos básicos
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from('physio_sessions')
+        .select(`
             id,
             session_date,
             session_time,
@@ -64,36 +58,70 @@ export default function PhysioSessionsList() {
             session_type,
             status,
             pain_level,
-            techniques_applied,
-            patients!inner(id, full_name, dni),
-            profiles!inner(id, full_name)
+            techniques_applied
           `)
-          .order('session_date', { ascending: false })
-          .limit(50);
+        .order('session_date', { ascending: false })
+        .limit(50);
 
-        if (directError) {
-          throw directError;
+      if (sessionsError) {
+        throw sessionsError;
+      }
+
+      // Obtener pacientes y terapeutas por separado
+      const patientIds = [...new Set(sessionsData?.map(s => s.patient_id).filter(Boolean) || [])];
+      const therapistIds = [...new Set(sessionsData?.map(s => s.therapist_id).filter(Boolean) || [])];
+
+      let patientMap: Record<string, any> = {};
+      let therapistMap: Record<string, any> = {};
+
+      if (patientIds.length > 0) {
+        const { data: patientsData } = await supabase
+          .from('patients')
+          .select('id, full_name, dni, first_name, last_name')
+          .in('id', patientIds);
+        
+        if (patientsData) {
+          patientMap = patientsData.reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {});
         }
+      }
 
-        const mappedSessions: PhysioSession[] = (directData as unknown[]).map((session: any) => ({
+      if (therapistIds.length > 0) {
+        const { data: therapistsData } = await supabase
+          .from('profiles')
+          .select('id, full_name, first_name, last_name')
+          .in('id', therapistIds);
+        
+        if (therapistsData) {
+          therapistMap = therapistsData.reduce((acc, t) => {
+            acc[t.id] = t;
+            return acc;
+          }, {});
+        }
+      }
+
+      const mappedSessions: PhysioSession[] = (sessionsData || []).map((session: any) => {
+        const patient = patientMap[session.patient_id] || {};
+        const therapist = therapistMap[session.therapist_id] || {};
+        return {
           id: session.id,
           session_date: session.session_date,
           session_time: session.session_time,
           patient_id: session.patient_id,
-          patient_name: session.patients?.full_name || 'Paciente desconocido',
-          patient_dni: session.patients?.dni || 'N/A',
+          patient_name: patient.full_name || patient.first_name + ' ' + patient.last_name || 'Paciente desconocido',
+          patient_dni: patient.dni || 'N/A',
           therapist_id: session.therapist_id,
-          therapist_name: session.profiles?.full_name || 'Terapeuta desconocido',
+          therapist_name: therapist.full_name || therapist.first_name + ' ' + therapist.last_name || 'Terapeuta desconocido',
           session_type: session.session_type || 'treatment',
           status: session.status || 'completed',
           pain_level: session.pain_level || 0,
           techniques_applied: session.techniques_applied || [],
-        }));
+        };
+      });
 
-        setSessions(mappedSessions);
-      } else if (data) {
-        setSessions(data as PhysioSession[]);
-      }
+      setSessions(mappedSessions);
     } catch (err) {
       console.error('Error fetching sessions:', err);
       setError('Error al cargar las sesiones. Por favor, verifica que las tablas de fisioterapia existan.');
