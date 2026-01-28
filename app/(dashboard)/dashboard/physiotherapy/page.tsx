@@ -665,7 +665,6 @@ export default function PhysiotherapyDashboard() {
           </div>
         </div>
       </div>
-      </div>
 
       {/* Recent Sessions - Full Width */}
       <div className="w-full">
@@ -737,21 +736,6 @@ export default function PhysiotherapyDashboard() {
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-                          className="text-purple-600 hover:text-purple-700 font-medium text-sm"
-                        >
-                          Ver historial
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       </div>
 
