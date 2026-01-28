@@ -81,7 +81,7 @@ export default function PhysioSessionsList() {
           .in('id', patientIds);
         
         if (patientsData) {
-          patientMap = patientsData.reduce((acc, p) => {
+          patientMap = patientsData.reduce<Record<string, any>>((acc, p) => {
             acc[p.id] = p;
             return acc;
           }, {});
@@ -95,7 +95,7 @@ export default function PhysioSessionsList() {
           .in('id', therapistIds);
         
         if (therapistsData) {
-          therapistMap = therapistsData.reduce((acc, t) => {
+          therapistMap = therapistsData.reduce<Record<string, any>>((acc, t) => {
             acc[t.id] = t;
             return acc;
           }, {});
