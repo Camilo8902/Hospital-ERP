@@ -208,11 +208,30 @@ export default function PhysioCatalogsPage() {
       } else if (activeTab === 'equipment') {
         const endpoint = editingItem ? `/api/physio-catalogs/equipment?id=${editingItem.id}` : '/api/physio-catalogs/equipment';
         const method = editingItem ? 'PUT' : 'POST';
-        console.log('Guardando equipo:', formData);
+        
+        // Normalizar datos del equipo
+        const equipmentData = {
+          code: formData.code || null,
+          name: formData.name || 'Equipo sin nombre',
+          description: formData.description || null,
+          brand: formData.brand || null,
+          model: formData.model || null,
+          serial_number: formData.serial_number || null,
+          location: formData.location || null,
+          status: formData.status || 'available',
+          treatment_type_id: formData.treatment_type_id || null,
+          purchase_date: formData.purchase_date || null,
+          last_maintenance_date: formData.last_maintenance_date || null,
+          next_maintenance_date: formData.next_maintenance_date || null,
+          is_active: formData.is_active !== false,
+          specifications: null,
+        };
+        
+        console.log('Guardando equipo:', equipmentData);
         const res = await fetch(endpoint, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(equipmentData),
         });
         if (!res.ok) {
           const errorData = await res.json();
@@ -591,6 +610,54 @@ export default function PhysioCatalogsPage() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <label className="label">Número de Serie</label>
+                      <input
+                        type="text"
+                        value={(formData.serial_number as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                        className="input"
+                        placeholder="Número de serie"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Número Interno</label>
+                      <input
+                        type="text"
+                        value={(formData.code as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        className="input"
+                        placeholder="Código interno"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Nombre del Equipo *</label>
+                      <input
+                        type="text"
+                        value={(formData.name as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="input"
+                        placeholder="Nombre del equipo"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Tipo de Tratamiento</label>
+                      <select
+                        value={(formData.treatment_type_id as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, treatment_type_id: e.target.value })}
+                        className="input"
+                      >
+                        <option value="">Ninguno</option>
+                        {treatmentTypes.map((tt) => (
+                          <option key={tt.id} value={tt.id}>{tt.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <label className="label">Marca</label>
                       <input
                         type="text"
@@ -635,6 +702,44 @@ export default function PhysioCatalogsPage() {
                         <option value="out_of_service">Fuera de servicio</option>
                       </select>
                     </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="label">Fecha de Compra</label>
+                      <input
+                        type="date"
+                        value={(formData.purchase_date as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
+                        className="input"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Último Mantenimiento</label>
+                      <input
+                        type="date"
+                        value={(formData.last_maintenance_date as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, last_maintenance_date: e.target.value })}
+                        className="input"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Próximo Mantenimiento</label>
+                      <input
+                        type="date"
+                        value={(formData.next_maintenance_date as string) || ''}
+                        onChange={(e) => setFormData({ ...formData, next_maintenance_date: e.target.value })}
+                        className="input"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      checked={(formData.is_active as boolean) !== false}
+                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                    />
+                    <label htmlFor="is_active">Equipo activo</label>
                   </div>
                 </>
               )}
