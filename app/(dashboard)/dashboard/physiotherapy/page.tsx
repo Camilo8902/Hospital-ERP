@@ -309,9 +309,10 @@ export default function PhysiotherapyDashboard() {
             session_time,
             patient_id,
             therapist_id,
-            status,
             pain_level,
-            notes
+            notes,
+            session_number,
+            is_initial_session
           `)
           .order('session_date', { ascending: false })
           .limit(10);
@@ -362,6 +363,8 @@ export default function PhysiotherapyDashboard() {
           const mappedRecentSessions: RecentSession[] = recentSessionsData.map((session: any) => {
             const patient = recentPatientMap[session.patient_id] || {};
             const therapist = recentTherapistMap[session.therapist_id] || {};
+            // Derivar estado de session_number: si tiene número de sesión > 0, está completada
+            const status = session.session_number && session.session_number > 0 ? 'completed' : 'scheduled';
             return {
               id: session.id,
               session_date: session.session_date,
@@ -370,7 +373,7 @@ export default function PhysiotherapyDashboard() {
               patient_name: patient.full_name || patient.first_name + ' ' + patient.last_name || 'Paciente desconocido',
               patient_dni: patient.dni || 'N/A',
               therapist_name: therapist.full_name || therapist.first_name + ' ' + therapist.last_name || 'Por asignar',
-              status: session.status || 'completed',
+              status: status,
               pain_level: session.pain_level || 0,
             };
           });

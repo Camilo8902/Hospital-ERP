@@ -57,10 +57,11 @@ export default function PhysioSessionsList() {
             session_time,
             patient_id,
             therapist_id,
-            status,
             pain_level,
             techniques_applied,
-            notes
+            notes,
+            session_number,
+            is_initial_session
           `)
         .order('session_date', { ascending: false })
         .limit(50);
@@ -122,6 +123,8 @@ export default function PhysioSessionsList() {
       const mappedSessions: PhysioSession[] = (sessionsData || []).map((session: any) => {
         const patient = patientMap[session.patient_id] || {};
         const therapist = therapistMap[session.therapist_id] || {};
+        // Derivar estado de session_number
+        const status = session.session_number && session.session_number > 0 ? 'completed' : 'scheduled';
         return {
           id: session.id,
           session_date: session.session_date,
@@ -131,8 +134,8 @@ export default function PhysioSessionsList() {
           patient_dni: patient.dni || 'N/A',
           therapist_id: session.therapist_id,
           therapist_name: therapist.full_name || therapist.first_name + ' ' + therapist.last_name || 'Terapeuta desconocido',
-          session_type: session.session_type || 'treatment',
-          status: session.status || 'completed',
+          session_type: session.is_initial_session ? 'initial' : 'follow-up',
+          status: status,
           pain_level: session.pain_level || 0,
           techniques_applied: session.techniques_applied || [],
         };
