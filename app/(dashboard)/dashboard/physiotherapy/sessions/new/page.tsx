@@ -7,24 +7,21 @@ import {
   ArrowLeft, 
   Save, 
   Loader2, 
-  Calendar, 
-  Clock, 
   Activity, 
-  AlertCircle, 
-  CheckCircle,
+  AlertCircle,
   Plus,
   Trash2,
   FlaskConical,
   Dumbbell,
-  Settings,
   ChevronDown,
   X,
-  Stethoscope
+  Stethoscope,
+  Check
 } from 'lucide-react';
 import Link from 'next/link';
 import { getPhysioAppointmentById } from '@/lib/actions/physiotherapy';
 
-// Types for catalogs
+// Tipos de catálogo
 interface TreatmentType {
   id: string;
   name: string;
@@ -39,7 +36,6 @@ interface Technique {
   treatment_type_id: string;
   physio_treatment_types?: { name: string };
   default_duration_minutes: number | null;
-  parameters_schema: Record<string, unknown> | null;
 }
 
 interface Equipment {
@@ -48,7 +44,6 @@ interface Equipment {
   brand: string | null;
   model: string | null;
   status: string;
-  specifications: Record<string, unknown> | null;
 }
 
 interface Exercise {
@@ -60,10 +55,22 @@ interface Exercise {
   target_muscle_group: string[] | null;
 }
 
-// Selected treatment with parameters
+// Tratamiento seleccionado con elementos hijos
 interface SelectedTreatment {
-  type: 'treatment_type' | 'technique' | 'equipment' | 'exercise';
   id: string;
+  treatmentTypeId: string;
+  treatmentTypeName: string;
+  techniques: TreatmentElement[];
+  equipment: TreatmentElement[];
+  exercises: TreatmentElement[];
+  notes: string;
+}
+
+// Elemento individual dentro de un tratamiento
+interface TreatmentElement {
+  id: string;
+  elementType: 'technique' | 'equipment' | 'exercise';
+  elementId: string;
   name: string;
   duration_minutes: number;
   parameters: Record<string, unknown>;
@@ -71,19 +78,34 @@ interface SelectedTreatment {
   notes: string;
 }
 
-// Función helper del lado del cliente para obtener cita de fisioterapia
-async function fetchPhysioAppointment(appointmentId: string) {
-  const result = await getPhysioAppointmentById(appointmentId);
-  if (result.success && result.data) {
-    return { data: result.data, error: null };
-  }
-  return { data: null, error: result.error };
+// Información de la cita
+interface AppointmentInfo {
+  id: string;
+  patient_id: string;
+  patient_full_name: string;
+  patient_dni: string;
+  start_time: string;
+  department_name: string;
+  reason: string;
 }
 
-// API functions
-async function fetchTechniques(): Promise<Technique[]> {
+// Funciones API
+async function fetchTreatmentTypes(): Promise<TreatmentType[]> {
   try {
-    const res = await fetch('/api/physio-catalogs/techniques');
+    const res = await fetch('/api/physio-catalogs/treatment-types');
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+async function fetchTechniques(treatmentTypeId?: string): Promise<Technique[]> {
+  try {
+    const url = treatmentTypeId 
+      ? `/api/physio-catalogs/techniques?treatment_type_id=${treatmentTypeId}`
+      : '/api/physio-catalogs/techniques';
+    const res = await fetch(url);
     if (!res.ok) return [];
     return await res.json();
   } catch {
@@ -95,17 +117,8 @@ async function fetchEquipment(): Promise<Equipment[]> {
   try {
     const res = await fetch('/api/physio-catalogs/equipment');
     if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
-  }
-}
-
-async function fetchTreatmentTypes(): Promise<TreatmentType[]> {
-  try {
-    const res = await fetch('/api/physio-catalogs/treatment-types');
-    if (!res.ok) return [];
-    return await res.json();
+    const data = await res.json();
+    return data.filter((e: Equipment) => e.status === 'available');
   } catch {
     return [];
   }
@@ -121,14 +134,12 @@ async function fetchExercises(): Promise<Exercise[]> {
   }
 }
 
-interface AppointmentInfo {
-  id: string;
-  patient_id: string;
-  patient_full_name: string;
-  patient_dni: string;
-  start_time: string;
-  department_name: string;
-  reason: string;
+async function fetchPhysioAppointment(appointmentId: string) {
+  const result = await getPhysioAppointmentById(appointmentId);
+  if (result.success && result.data) {
+    return { data: result.data, error: null };
+  }
+  return { data: null, error: result.error };
 }
 
 export default function NewPhysioSessionForm() {
@@ -140,39 +151,44 @@ export default function NewPhysioSessionForm() {
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [appointmentInfo, setAppointmentInfo] = useState<AppointmentInfo | null>(null);
-  const [isInitialSession, setIsInitialSession] = useState(false);
-  const [isReassessment, setIsReassessment] = useState(false);
   
-  // Catalog data
+  // Datos de catálogos
   const [treatmentTypes, setTreatmentTypes] = useState<TreatmentType[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   
-  // Selected treatments
+  // Tratamientos seleccionados (jerárquicos)
   const [selectedTreatments, setSelectedTreatments] = useState<SelectedTreatment[]>([]);
   
-  // UI state
+  // Elementos disponibles para agregar (filtrados por tipo de tratamiento)
+  const [availableTechniques, setAvailableTechniques] = useState<Technique[]>([]);
+  const [availableEquipment, setAvailableEquipment] = useState<Equipment[]>([]);
+  const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
+  
+  // UI State
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
-  const [treatmentType, setTreatmentType] = useState<'treatment_type' | 'technique' | 'equipment' | 'exercise'>('treatment_type');
-
+  const [selectedTreatmentType, setSelectedTreatmentType] = useState<TreatmentType | null>(null);
+  const [activeTab, setActiveTab] = useState<'techniques' | 'equipment' | 'exercises'>('techniques');
+  
+  // Form data
   interface FormData {
-  session_date: string;
-  session_time: string;
-  duration_minutes: string;
-  pain_level: number;
-  pain_location: string;
-  body_region: string;
-  muscle_group: string;
-  muscle_strength_grade: number;
-  rom_affected: string;
-  subjective: string;
-  objective: string;
-  analysis: string;
-  plan: string;
-}
+    session_date: string;
+    session_time: string;
+    duration_minutes: string;
+    pain_level: number;
+    pain_location: string;
+    body_region: string;
+    muscle_group: string;
+    muscle_strength_grade: number;
+    rom_affected: string;
+    subjective: string;
+    objective: string;
+    analysis: string;
+    plan: string;
+  }
 
-const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<FormData>({
     session_date: '',
     session_time: '',
     duration_minutes: '45',
@@ -188,7 +204,7 @@ const [formData, setFormData] = useState<FormData>({
     plan: '',
   });
 
-  // Load catalog data
+  // Cargar datos de catálogos
   useEffect(() => {
     async function loadCatalogs() {
       try {
@@ -200,7 +216,7 @@ const [formData, setFormData] = useState<FormData>({
         ]);
         setTreatmentTypes(tt);
         setTechniques(t);
-        setEquipment(e.filter(item => item.status === 'available'));
+        setEquipment(e);
         setExercises(ex);
       } catch (err) {
         console.error('Error loading catalogs:', err);
@@ -211,7 +227,7 @@ const [formData, setFormData] = useState<FormData>({
     loadCatalogs();
   }, []);
 
-  // Load appointment data
+  // Cargar datos de la cita
   useEffect(() => {
     const loadAppointmentData = async () => {
       const appointmentId = searchParams.get('appointment_id');
@@ -239,60 +255,182 @@ const [formData, setFormData] = useState<FormData>({
     }));
   };
 
-  const addTreatment = (item: Technique | Equipment | Exercise, type: 'technique' | 'equipment' | 'exercise') => {
-    let duration = 15;
-    let name = '';
-    
-    if (type === 'technique' || type === 'exercise') {
-      const t = item as Technique;
-      duration = t.default_duration_minutes || 15;
-      name = t.name;
-    } else {
-      const e = item as Equipment;
-      duration = 10;
-      name = `${e.brand || ''} ${e.model || ''}`.trim() || e.name;
-    }
+  // Abrir modal para agregar tipo de tratamiento
+  const openTreatmentModal = () => {
+    setShowTreatmentModal(true);
+    setSelectedTreatmentType(null);
+    setActiveTab('techniques');
+  };
+
+  // Seleccionar tipo de tratamiento y cargar elementos relacionados
+  const selectTreatmentType = (tt: TreatmentType) => {
+    setSelectedTreatmentType(tt);
+    // Cargar técnicas filtradas por tipo de tratamiento
+    fetchTechniques(tt.id).then(setAvailableTechniques);
+    // Equipment y exercises no están filtrados por tipo de tratamiento
+    setAvailableEquipment(equipment);
+    setAvailableExercises(exercises);
+  };
+
+  // Agregar tipo de tratamiento a la sesión
+  const addTreatmentType = () => {
+    if (!selectedTreatmentType) return;
     
     const newTreatment: SelectedTreatment = {
-      type,
-      id: item.id,
-      name,
-      duration_minutes: duration,
-      parameters: {},
-      results: {},
+      id: crypto.randomUUID(),
+      treatmentTypeId: selectedTreatmentType.id,
+      treatmentTypeName: selectedTreatmentType.name,
+      techniques: [],
+      equipment: [],
+      exercises: [],
       notes: '',
     };
     
-    setSelectedTreatments((prev: SelectedTreatment[]) => [...prev, newTreatment]);
+    setSelectedTreatments(prev => [...prev, newTreatment]);
     setShowTreatmentModal(false);
+    setSelectedTreatmentType(null);
   };
 
-  const removeTreatment = (index: number) => {
-    setSelectedTreatments((prev: SelectedTreatment[]) => prev.filter((_, i) => i !== index));
+  // Agregar técnica al tratamiento seleccionado
+  const addTechnique = (technique: Technique, treatmentId: string) => {
+    setSelectedTreatments(prev => prev.map(t => {
+      if (t.id === treatmentId) {
+        return {
+          ...t,
+          techniques: [...t.techniques, {
+            id: crypto.randomUUID(),
+            elementType: 'technique',
+            elementId: technique.id,
+            name: technique.name,
+            duration_minutes: technique.default_duration_minutes || 15,
+            parameters: {},
+            results: {},
+            notes: '',
+          }]
+        };
+      }
+      return t;
+    }));
   };
 
-  const updateTreatment = (index: number, updates: Partial<SelectedTreatment>) => {
-    setSelectedTreatments((prev: SelectedTreatment[]) => prev.map((t: SelectedTreatment, i: number) => 
-      i === index ? { ...t, ...updates } : t
-    ));
+  // Agregar equipo al tratamiento seleccionado
+  const addEquipmentItem = (eq: Equipment, treatmentId: string) => {
+    setSelectedTreatments(prev => prev.map(t => {
+      if (t.id === treatmentId) {
+        return {
+          ...t,
+          equipment: [...t.equipment, {
+            id: crypto.randomUUID(),
+            elementType: 'equipment',
+            elementId: eq.id,
+            name: `${eq.brand || ''} ${eq.model || ''}`.trim() || eq.name,
+            duration_minutes: 10,
+            parameters: {},
+            results: {},
+            notes: '',
+          }]
+        };
+      }
+      return t;
+    }));
+  };
+
+  // Agregar ejercicio al tratamiento seleccionado
+  const addExerciseItem = (ex: Exercise, treatmentId: string) => {
+    setSelectedTreatments(prev => prev.map(t => {
+      if (t.id === treatmentId) {
+        return {
+          ...t,
+          exercises: [...t.exercises, {
+            id: crypto.randomUUID(),
+            elementType: 'exercise',
+            elementId: ex.id,
+            name: ex.name,
+            duration_minutes: 15,
+            parameters: {},
+            results: {},
+            notes: '',
+          }]
+        };
+      }
+      return t;
+    }));
+  };
+
+  // Eliminar tipo de tratamiento
+  const removeTreatment = (treatmentId: string) => {
+    setSelectedTreatments(prev => prev.filter(t => t.id !== treatmentId));
+  };
+
+  // Eliminar elemento de un tratamiento
+  const removeElement = (treatmentId: string, elementId: string, elementType: 'technique' | 'equipment' | 'exercise') => {
+    setSelectedTreatments(prev => prev.map(t => {
+      if (t.id === treatmentId) {
+        return {
+          ...t,
+          [elementType === 'technique' ? 'techniques' : elementType === 'equipment' ? 'equipment' : 'exercises']: 
+            t[elementType === 'technique' ? 'techniques' : elementType === 'equipment' ? 'equipment' : 'exercises'].filter(e => e.id !== elementId)
+        };
+      }
+      return t;
+    }));
+  };
+
+  // Actualizar notas de un tratamiento
+  const updateTreatmentNotes = (treatmentId: string, notes: string) => {
+    setSelectedTreatments(prev => prev.map(t => {
+      if (t.id === treatmentId) {
+        return { ...t, notes };
+      }
+      return t;
+    }));
+  };
+
+  // Calcular duración total
+  const calculateTotalDuration = () => {
+    let total = 0;
+    selectedTreatments.forEach(t => {
+      t.techniques.forEach(el => total += el.duration_minutes);
+      t.equipment.forEach(el => total += el.duration_minutes);
+      t.exercises.forEach(el => total += el.duration_minutes);
+    });
+    return total > 0 ? total : parseInt(formData.duration_minutes);
   };
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-
     try {
+      setLoading(true);
+      setError(null);
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('Usuario no autenticado');
       }
 
-      // Calculate total duration from treatments
-      const totalTreatmentDuration = selectedTreatments.reduce((sum: number, t: SelectedTreatment) => sum + t.duration_minutes, 0);
-      const finalDuration = totalTreatmentDuration > 0 ? totalTreatmentDuration : parseInt(formData.duration_minutes);
+      const finalDuration = calculateTotalDuration();
 
-      // Create session with treatments as JSON
+      // Preparar datos para guardar
+      const techniquesApplied: string[] = [];
+      const exercisesApplied: string[] = [];
+      const equipmentUsed: string[] = [];
+      const treatmentsDetail: any[] = [];
+
+      selectedTreatments.forEach(t => {
+        treatmentsDetail.push({
+          treatment_type_id: t.treatmentTypeId,
+          treatment_type_name: t.treatmentTypeName,
+          notes: t.notes,
+          techniques: t.techniques.map(el => ({ id: el.elementId, name: el.name, duration: el.duration_minutes })),
+          equipment: t.equipment.map(el => ({ id: el.elementId, name: el.name, duration: el.duration_minutes })),
+          exercises: t.exercises.map(el => ({ id: el.elementId, name: el.name, duration: el.duration_minutes })),
+        });
+        
+        t.techniques.forEach(el => techniquesApplied.push(el.name));
+        t.equipment.forEach(el => equipmentUsed.push(el.name));
+        t.exercises.forEach(el => exercisesApplied.push(el.name));
+      });
+
       const { data: sessionData, error: sessionError } = await supabase
         .from('physio_sessions')
         .insert({
@@ -302,18 +440,16 @@ const [formData, setFormData] = useState<FormData>({
           session_date: formData.session_date,
           session_time: formData.session_time,
           duration_minutes: finalDuration,
-          is_initial_session: isInitialSession,
-          is_reassessment: isReassessment,
           pain_level: formData.pain_level,
           pain_location: formData.pain_location,
           body_region: formData.body_region,
           muscle_group: formData.muscle_group,
           muscle_strength_grade: formData.muscle_strength_grade,
           rom_affected: formData.rom_affected,
-          techniques_applied: selectedTreatments.filter((t: SelectedTreatment) => t.type === 'technique').map((t: SelectedTreatment) => t.name),
-          exercises_applied: selectedTreatments.filter((t: SelectedTreatment) => t.type === 'exercise').map((t: SelectedTreatment) => t.name),
-          equipment_used: selectedTreatments.filter((t: SelectedTreatment) => t.type === 'equipment').map((t: SelectedTreatment) => t.name),
-          treatments_detail: selectedTreatments,
+          techniques_applied: techniquesApplied,
+          exercises_applied: exercisesApplied,
+          equipment_used: equipmentUsed,
+          treatments_detail: treatmentsDetail,
           subjective: formData.subjective,
           objective: formData.objective,
           analysis: formData.analysis,
@@ -347,10 +483,7 @@ const [formData, setFormData] = useState<FormData>({
   if (loadingCatalogs) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-4" />
-          <p className="text-gray-500">Cargando catálogos...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
@@ -359,11 +492,8 @@ const [formData, setFormData] = useState<FormData>({
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link
-          href="/dashboard/physiotherapy"
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        <Link href="/dashboard/physiotherapy" className="p-2 hover:bg-gray-100 rounded-lg">
+          <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Nueva Sesión de Fisioterapia</h1>
@@ -378,194 +508,42 @@ const [formData, setFormData] = useState<FormData>({
         </div>
       )}
 
-      {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Appointment Info */}
-        {appointmentInfo && (
-          <div className="card border-purple-200 bg-purple-50">
-            <div className="card-header bg-purple-100">
-              <h2 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Información de la Cita
-              </h2>
-            </div>
-            <div className="card-body">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500">Paciente</p>
-                  <p className="font-medium text-gray-900">{appointmentInfo.patient_full_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Fecha y Hora</p>
-                  <p className="font-medium text-gray-900">
-                    {new Date(appointmentInfo.start_time).toLocaleDateString('es-ES')} - {new Date(appointmentInfo.start_time).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
+        {/* Appointment Info Card */}
+        <div className="card border-purple-200 bg-purple-50">
+          <div className="card-header bg-purple-100">
+            <h2 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
+              <Stethoscope className="w-5 h-5" />
+              Información de la Cita
+            </h2>
+          </div>
+          <div className="card-body">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Paciente</p>
+                <p className="font-medium text-gray-900">{appointmentInfo?.patient_full_name || 'Sin cita seleccionada'}</p>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Session Info */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="text-lg font-semibold text-gray-900">Información de la Sesión</h2>
-          </div>
-          <div className="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="label mb-1.5">Fecha *</label>
-              <input
-                type="date"
-                name="session_date"
-                value={formData.session_date}
-                onChange={handleChange}
-                className="input"
-                required
-              />
-            </div>
-            <div>
-              <label className="label mb-1.5">Hora *</label>
-              <input
-                type="time"
-                name="session_time"
-                value={formData.session_time}
-                onChange={handleChange}
-                className="input"
-                required
-              />
-            </div>
-            <div className="flex items-end gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isInitialSession}
-                  onChange={(e) => setIsInitialSession(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded"
-                />
-                <span className="text-sm text-gray-700">Sesión Inicial</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isReassessment}
-                  onChange={(e) => setIsReassessment(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded"
-                />
-                <span className="text-sm text-gray-700">Reevaluación</span>
-              </label>
+              <div>
+                <p className="text-sm text-gray-500">Fecha y Hora</p>
+                <p className="font-medium text-gray-900">
+                  {appointmentInfo ? new Date(appointmentInfo.start_time).toLocaleString() : 'N/A'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Clinical Data */}
+        {/* Treatments Section */}
         <div className="card">
-          <div className="card-header">
-            <h2 className="text-lg font-semibold text-gray-900">Evaluación Clínica</h2>
-          </div>
-          <div className="card-body grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="label mb-1.5">Nivel de Dolor (EVA 0-10)</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  name="pain_level"
-                  min="0"
-                  max="10"
-                  value={formData.pain_level}
-                  onChange={handleChange}
-                  className="flex-1"
-                />
-                <span className={`w-10 h-10 flex items-center justify-center rounded-full font-bold ${
-                  formData.pain_level >= 7 ? 'bg-red-500 text-white' :
-                  formData.pain_level >= 4 ? 'bg-yellow-500 text-white' :
-                  'bg-green-500 text-white'
-                }`}>
-                  {formData.pain_level}
-                </span>
-              </div>
-            </div>
-            <div>
-              <label className="label mb-1.5">Ubicación del Dolor</label>
-              <input
-                type="text"
-                name="pain_location"
-                value={formData.pain_location}
-                onChange={handleChange}
-                className="input"
-                placeholder="Ej. Lumbar, cervical..."
-              />
-            </div>
-            <div>
-              <label className="label mb-1.5">Región Corporal</label>
-              <select
-                name="body_region"
-                value={formData.body_region}
-                onChange={handleChange}
-                className="input"
-              >
-                <option value="">Seleccionar...</option>
-                <option value="cervical">Cervical</option>
-                <option value="lumbar">Lumbar</option>
-                <option value="shoulder">Hombro</option>
-                <option value="knee">Rodilla</option>
-                <option value="hip">Cadera</option>
-                <option value="ankle">Tobillo</option>
-                <option value="elbow">Codo</option>
-                <option value="wrist">Muñeca</option>
-              </select>
-            </div>
-            <div>
-              <label className="label mb-1.5">Grupo Muscular</label>
-              <input
-                type="text"
-                name="muscle_group"
-                value={formData.muscle_group}
-                onChange={handleChange}
-                className="input"
-                placeholder="Ej. Deltoides, cuádriceps..."
-              />
-            </div>
-            <div>
-              <label className="label mb-1.5">Fuerza Muscular (0-5)</label>
-              <select
-                name="muscle_strength_grade"
-                value={formData.muscle_strength_grade}
-                onChange={handleChange}
-                className="input"
-              >
-                <option value="0">0 - Parálisis</option>
-                <option value="1">1 - Contracción</option>
-                <option value="2">2 - Gravedad eliminada</option>
-                <option value="3">3 - Contra gravedad</option>
-                <option value="4">4 - Resistencia</option>
-                <option value="5">5 - Normal</option>
-              </select>
-            </div>
-            <div>
-              <label className="label mb-1.5">ROM Afectado</label>
-              <input
-                type="text"
-                name="rom_affected"
-                value={formData.rom_affected}
-                onChange={handleChange}
-                className="input"
-                placeholder="Ej. Flexión 90°..."
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Treatments Applied */}
-        <div className="card">
-          <div className="card-header flex items-center justify-between">
+          <div className="card-header flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-purple-600" />
+              <Activity className="w-5 h-5" />
               Tratamientos Aplicados
             </h2>
             <button
               type="button"
-              onClick={() => setShowTreatmentModal(true)}
-              className="btn btn-primary btn-sm flex items-center gap-1"
+              onClick={openTreatmentModal}
+              className="btn btn-primary flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Agregar Tratamiento
@@ -574,53 +552,108 @@ const [formData, setFormData] = useState<FormData>({
           <div className="card-body">
             {selectedTreatments.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <Activity className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                <Stethoscope className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>No hay tratamientos agregados</p>
-                <p className="text-sm">Agrega técnicas, equipos o ejercicios utilizados</p>
+                <p className="text-sm">Haz clic en "Agregar Tratamiento" para comenzar</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {selectedTreatments.map((treatment, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      treatment.type === 'technique' ? 'bg-blue-100 text-blue-600' :
-                      treatment.type === 'equipment' ? 'bg-green-100 text-green-600' :
-                      'bg-orange-100 text-orange-600'
-                    }`}>
-                      {treatment.type === 'technique' ? <Activity className="w-5 h-5" /> :
-                       treatment.type === 'equipment' ? <FlaskConical className="w-5 h-5" /> :
-                       <Dumbbell className="w-5 h-5" />}
+              <div className="space-y-4">
+                {selectedTreatments.map((treatment) => (
+                  <div key={treatment.id} className="border rounded-lg p-4 bg-gray-50">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{treatment.treatmentTypeName}</h3>
+                        <p className="text-sm text-gray-500">
+                          {treatment.techniques.length + treatment.equipment.length + treatment.exercises.length} elementos
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeTreatment(treatment.id)}
+                        className="p-2 text-red-600 hover:bg-red-100 rounded"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-gray-900">{treatment.name}</p>
-                          <p className="text-xs text-gray-500 capitalize">{treatment.type}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            value={treatment.duration_minutes}
-                            onChange={(e) => updateTreatment(index, { duration_minutes: parseInt(e.target.value) || 0 })}
-                            className="input w-20 text-center text-sm"
-                            min="1"
-                          />
-                          <span className="text-sm text-gray-500">min</span>
-                          <button
-                            type="button"
-                            onClick={() => removeTreatment(index)}
-                            className="p-1 text-red-500 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                    
+                    {/* Técnicas */}
+                    {treatment.techniques.length > 0 && (
+                      <div className="mb-3">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                          <Activity className="w-4 h-4" /> Técnicas
+                        </h4>
+                        <div className="space-y-1">
+                          {treatment.techniques.map((el) => (
+                            <div key={el.id} className="flex justify-between items-center text-sm bg-white p-2 rounded">
+                              <span>{el.name} ({el.duration_minutes} min)</span>
+                              <button
+                                type="button"
+                                onClick={() => removeElement(treatment.id, el.id, 'technique')}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <input
-                        type="text"
+                    )}
+                    
+                    {/* Equipos */}
+                    {treatment.equipment.length > 0 && (
+                      <div className="mb-3">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                          <FlaskConical className="w-4 h-4" /> Equipos
+                        </h4>
+                        <div className="space-y-1">
+                          {treatment.equipment.map((el) => (
+                            <div key={el.id} className="flex justify-between items-center text-sm bg-white p-2 rounded">
+                              <span>{el.name} ({el.duration_minutes} min)</span>
+                              <button
+                                type="button"
+                                onClick={() => removeElement(treatment.id, el.id, 'equipment')}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Ejercicios */}
+                    {treatment.exercises.length > 0 && (
+                      <div className="mb-3">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                          <Dumbbell className="w-4 h-4" /> Ejercicios
+                        </h4>
+                        <div className="space-y-1">
+                          {treatment.exercises.map((el) => (
+                            <div key={el.id} className="flex justify-between items-center text-sm bg-white p-2 rounded">
+                              <span>{el.name} ({el.duration_minutes} min)</span>
+                              <button
+                                type="button"
+                                onClick={() => removeElement(treatment.id, el.id, 'exercise')}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Notas del tratamiento */}
+                    <div>
+                      <label className="text-sm text-gray-600">Notas</label>
+                      <textarea
                         value={treatment.notes}
-                        onChange={(e) => updateTreatment(index, { notes: e.target.value })}
-                        className="input mt-2 text-sm"
-                        placeholder="Notas del tratamiento..."
+                        onChange={(e) => updateTreatmentNotes(treatment.id, e.target.value)}
+                        className="input mt-1"
+                        rows={2}
+                        placeholder="Observaciones específicas..."
                       />
                     </div>
                   </div>
@@ -630,151 +663,337 @@ const [formData, setFormData] = useState<FormData>({
           </div>
         </div>
 
-        {/* SOAP Notes */}
+        {/* Session Info Card */}
         <div className="card">
           <div className="card-header">
-            <h2 className="text-lg font-semibold text-gray-900">Notas SOAP</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Información de la Sesión</h2>
           </div>
           <div className="card-body space-y-4">
-            <div>
-              <label className="label mb-1.5 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">S</span>
-                Subjetivo
-              </label>
-              <textarea
-                name="subjective"
-                value={formData.subjective}
-                onChange={handleChange}
-                className="input min-h-[80px]"
-                placeholder="Qué refiere el paciente..."
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                <input
+                  type="date"
+                  name="session_date"
+                  value={formData.session_date}
+                  onChange={handleChange}
+                  className="input"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                <input
+                  type="time"
+                  name="session_time"
+                  value={formData.session_time}
+                  onChange={handleChange}
+                  className="input"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Duración Total (min)</label>
+                <input
+                  type="text"
+                  value={calculateTotalDuration()}
+                  className="input bg-gray-100"
+                  disabled
+                />
+              </div>
             </div>
-            <div>
-              <label className="label mb-1.5 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">O</span>
-                Objetivo
-              </label>
-              <textarea
-                name="objective"
-                value={formData.objective}
-                onChange={handleChange}
-                className="input min-h-[80px]"
-                placeholder="Hallazgos objetivos..."
-              />
+
+            {/* Evaluación del paciente */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de Dolor (0-10)</label>
+                <input
+                  type="range"
+                  name="pain_level"
+                  min="0"
+                  max="10"
+                  value={formData.pain_level}
+                  onChange={handleChange}
+                  className="w-full"
+                />
+                <div className="text-center text-sm text-gray-600">{formData.pain_level}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Región Corporal</label>
+                <input
+                  type="text"
+                  name="body_region"
+                  value={formData.body_region}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="Ej: Lumbar, Cervical..."
+                />
+              </div>
             </div>
-            <div>
-              <label className="label mb-1.5 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center text-xs font-bold">A</span>
-                Análisis
-              </label>
-              <textarea
-                name="analysis"
-                value={formData.analysis}
-                onChange={handleChange}
-                className="input min-h-[80px]"
-                placeholder="Interpretación clínica..."
-              />
-            </div>
-            <div>
-              <label className="label mb-1.5 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">P</span>
-                Plan
-              </label>
-              <textarea
-                name="plan"
-                value={formData.plan}
-                onChange={handleChange}
-                className="input min-h-[80px]"
-                placeholder="Plan de tratamiento..."
-              />
+
+            {/* SOAP */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subjetivo (S)</label>
+                <textarea
+                  name="subjective"
+                  value={formData.subjective}
+                  onChange={handleChange}
+                  className="input"
+                  rows={3}
+                  placeholder="Quejas del paciente, síntomas referidos..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Objetivo (O)</label>
+                <textarea
+                  name="objective"
+                  value={formData.objective}
+                  onChange={handleChange}
+                  className="input"
+                  rows={3}
+                  placeholder="Hallazgos clínicos, observación..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Análisis (A)</label>
+                <textarea
+                  name="analysis"
+                  value={formData.analysis}
+                  onChange={handleChange}
+                  className="input"
+                  rows={3}
+                  placeholder="Diagnóstico fisioterapéutico, progresión..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Plan (P)</label>
+                <textarea
+                  name="plan"
+                  value={formData.plan}
+                  onChange={handleChange}
+                  className="input"
+                  rows={3}
+                  placeholder="Próximas sesiones, ejercicios en casa..."
+                />
+              </div>
             </div>
           </div>
         </div>
 
         {/* Submit */}
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-4">
           <Link href="/dashboard/physiotherapy" className="btn btn-secondary">
             Cancelar
           </Link>
-          <button type="submit" disabled={loading} className="btn btn-primary flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn btn-primary flex items-center gap-2"
+          >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Guardar Sesión
           </button>
         </div>
       </form>
 
-      {/* Treatment Modal */}
+      {/* Treatment Selection Modal */}
       {showTreatmentModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Agregar Tratamiento</h2>
-              <button onClick={() => setShowTreatmentModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Agregar Tratamiento</h3>
+              <button onClick={() => setShowTreatmentModal(false)} className="p-2 hover:bg-gray-100 rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
+            
             <div className="p-4">
-              {/* Treatment Type Tabs */}
-              <div className="flex gap-2 mb-4">
-                {[
-                  { id: 'technique', label: 'Técnicas', icon: Activity },
-                  { id: 'equipment', label: 'Equipos', icon: FlaskConical },
-                  { id: 'exercise', label: 'Ejercicios', icon: Dumbbell },
-                ].map((type) => (
+              {!selectedTreatmentType ? (
+                // Paso 1: Seleccionar tipo de tratamiento
+                <div>
+                  <h4 className="font-medium mb-3">Selecciona un tipo de tratamiento:</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {treatmentTypes.map((tt) => (
+                      <button
+                        key={tt.id}
+                        onClick={() => selectTreatmentType(tt)}
+                        className="p-4 border rounded-lg text-left hover:bg-purple-50 hover:border-purple-300 transition-colors"
+                      >
+                        <div className="font-medium text-gray-900">{tt.name}</div>
+                        {tt.description && (
+                          <div className="text-sm text-gray-500 mt-1">{tt.description}</div>
+                        )}
+                        {tt.category && (
+                          <div className="text-xs text-purple-600 mt-1">{tt.category}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                // Paso 2: Agregar elementos al tratamiento
+                <div>
                   <button
-                    key={type.id}
-                    type="button"
-                    onClick={() => setTreatmentType(type.id as 'technique' | 'equipment' | 'exercise')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                      treatmentType === type.id
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    onClick={() => setSelectedTreatmentType(null)}
+                    className="text-sm text-purple-600 mb-3 flex items-center gap-1"
                   >
-                    <type.icon className="w-4 h-4" />
-                    {type.label}
+                    <ChevronDown className="w-4 h-4 rotate-90" />
+                    Volver a tipos de tratamiento
                   </button>
-                ))}
-              </div>
-
-              {/* Treatment List */}
-              <div className="space-y-2">
-                {treatmentType === 'technique' && techniques.map((technique) => (
-                  <button
-                    key={technique.id}
-                    type="button"
-                    onClick={() => addTreatment(technique, 'technique')}
-                    className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <p className="font-medium text-gray-900">{technique.name}</p>
-                    <p className="text-sm text-gray-500">{technique.physio_treatment_types?.name}</p>
-                  </button>
-                ))}
-                {treatmentType === 'equipment' && equipment.map((eq) => (
-                  <button
-                    key={eq.id}
-                    type="button"
-                    onClick={() => addTreatment(eq, 'equipment')}
-                    className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <p className="font-medium text-gray-900">{eq.name}</p>
-                    <p className="text-sm text-gray-500">{eq.brand} {eq.model}</p>
-                  </button>
-                ))}
-                {treatmentType === 'exercise' && exercises.map((exercise) => (
-                  <button
-                    key={exercise.id}
-                    type="button"
-                    onClick={() => addTreatment(exercise, 'exercise')}
-                    className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <p className="font-medium text-gray-900">{exercise.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {exercise.body_region} • {exercise.difficulty_level}
-                    </p>
-                  </button>
-                ))}
-              </div>
+                  
+                  <h4 className="font-medium mb-3">
+                    Agregar a: <span className="text-purple-600">{selectedTreatmentType.name}</span>
+                  </h4>
+                  
+                  {/* Tabs para elementos */}
+                  <div className="border-b mb-4">
+                    <div className="flex gap-4">
+                      {[
+                        { id: 'techniques', label: 'Técnicas', icon: Activity },
+                        { id: 'equipment', label: 'Equipos', icon: FlaskConical },
+                        { id: 'exercises', label: 'Ejercicios', icon: Dumbbell },
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id as any)}
+                          className={`flex items-center gap-2 py-2 px-1 border-b-2 text-sm ${
+                            activeTab === tab.id
+                              ? 'border-purple-600 text-purple-600'
+                              : 'border-transparent text-gray-500'
+                          }`}
+                        >
+                          <tab.icon className="w-4 h-4" />
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Lista de elementos disponibles */}
+                  <div className="max-h-64 overflow-y-auto">
+                    {activeTab === 'techniques' && availableTechniques.map((t) => (
+                      <div key={t.id} className="flex justify-between items-center p-3 border rounded mb-2 hover:bg-gray-50">
+                        <div>
+                          <div className="font-medium">{t.name}</div>
+                          {t.description && (
+                            <div className="text-sm text-gray-500">{t.description}</div>
+                          )}
+                          <div className="text-xs text-gray-400">{t.default_duration_minutes} min</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newTreatment = {
+                              id: crypto.randomUUID(),
+                              treatmentTypeId: selectedTreatmentType.id,
+                              treatmentTypeName: selectedTreatmentType.name,
+                              techniques: [],
+                              equipment: [],
+                              exercises: [],
+                              notes: '',
+                            };
+                            // Agregar la técnica directamente
+                            newTreatment.techniques.push({
+                              id: crypto.randomUUID(),
+                              elementType: 'technique' as const,
+                              elementId: t.id,
+                              name: t.name,
+                              duration_minutes: t.default_duration_minutes || 15,
+                              parameters: {},
+                              results: {},
+                              notes: '',
+                            });
+                            setSelectedTreatments(prev => [...prev, newTreatment]);
+                            setShowTreatmentModal(false);
+                          }}
+                          className="btn btn-primary btn-sm flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" /> Agregar
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {activeTab === 'equipment' && availableEquipment.map((e) => (
+                      <div key={e.id} className="flex justify-between items-center p-3 border rounded mb-2 hover:bg-gray-50">
+                        <div>
+                          <div className="font-medium">{e.name}</div>
+                          <div className="text-sm text-gray-500">{e.brand} {e.model}</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newTreatment = {
+                              id: crypto.randomUUID(),
+                              treatmentTypeId: selectedTreatmentType.id,
+                              treatmentTypeName: selectedTreatmentType.name,
+                              techniques: [],
+                              equipment: [],
+                              exercises: [],
+                              notes: '',
+                            };
+                            newTreatment.equipment.push({
+                              id: crypto.randomUUID(),
+                              elementType: 'equipment' as const,
+                              elementId: e.id,
+                              name: `${e.brand || ''} ${e.model || ''}`.trim() || e.name,
+                              duration_minutes: 10,
+                              parameters: {},
+                              results: {},
+                              notes: '',
+                            });
+                            setSelectedTreatments(prev => [...prev, newTreatment]);
+                            setShowTreatmentModal(false);
+                          }}
+                          className="btn btn-primary btn-sm flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" /> Agregar
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {activeTab === 'exercises' && availableExercises.map((ex) => (
+                      <div key={ex.id} className="flex justify-between items-center p-3 border rounded mb-2 hover:bg-gray-50">
+                        <div>
+                          <div className="font-medium">{ex.name}</div>
+                          {ex.body_region && (
+                            <div className="text-sm text-gray-500">{ex.body_region}</div>
+                          )}
+                          {ex.difficulty_level && (
+                            <div className="text-xs text-gray-400">{ex.difficulty_level}</div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newTreatment = {
+                              id: crypto.randomUUID(),
+                              treatmentTypeId: selectedTreatmentType.id,
+                              treatmentTypeName: selectedTreatmentType.name,
+                              techniques: [],
+                              equipment: [],
+                              exercises: [],
+                              notes: '',
+                            };
+                            newTreatment.exercises.push({
+                              id: crypto.randomUUID(),
+                              elementType: 'exercise' as const,
+                              elementId: ex.id,
+                              name: ex.name,
+                              duration_minutes: 15,
+                              parameters: {},
+                              results: {},
+                              notes: '',
+                            });
+                            setSelectedTreatments(prev => [...prev, newTreatment]);
+                            setShowTreatmentModal(false);
+                          }}
+                          className="btn btn-primary btn-sm flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" /> Agregar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

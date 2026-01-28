@@ -172,10 +172,60 @@ export default function PhysioCatalogsPage() {
   };
 
   const handleSave = async () => {
-    // Implementar guardado según el tab activo
-    console.log('Guardando:', formData);
-    handleCloseModal();
-    loadData();
+    try {
+      setLoading(true);
+      let success = false;
+      
+      if (activeTab === 'treatments') {
+        const endpoint = editingItem ? `/api/physio-catalogs/treatment-types?id=${editingItem.id}` : '/api/physio-catalogs/treatment-types';
+        const method = editingItem ? 'PUT' : 'POST';
+        const res = await fetch(endpoint, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        success = res.ok;
+      } else if (activeTab === 'techniques') {
+        const endpoint = editingItem ? `/api/physio-catalogs/techniques?id=${editingItem.id}` : '/api/physio-catalogs/techniques';
+        const method = editingItem ? 'PUT' : 'POST';
+        const res = await fetch(endpoint, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        success = res.ok;
+      } else if (activeTab === 'equipment') {
+        const endpoint = editingItem ? `/api/physio-catalogs/equipment?id=${editingItem.id}` : '/api/physio-catalogs/equipment';
+        const method = editingItem ? 'PUT' : 'POST';
+        const res = await fetch(endpoint, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        success = res.ok;
+      } else if (activeTab === 'exercises') {
+        const endpoint = editingItem ? `/api/physio-catalogs/exercises?id=${editingItem.id}` : '/api/physio-catalogs/exercises';
+        const method = editingItem ? 'PUT' : 'POST';
+        const res = await fetch(endpoint, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        success = res.ok;
+      }
+      
+      if (success) {
+        await loadData(); // Refresh data after save
+        handleCloseModal();
+      } else {
+        setError('Error al guardar el elemento');
+      }
+    } catch (err) {
+      setError('Error al guardar: ' + (err instanceof Error ? err.message : 'Error desconocido'));
+      console.error('Error saving:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
