@@ -743,6 +743,7 @@ export async function getPhysioSessionsList(
       medical_record_id: session.medical_record_id,
       patient_id: session.patient_id,
       created_at: session.created_at,
+      status: (session.status as string) || 'completed',
     }));
 
     return { 
