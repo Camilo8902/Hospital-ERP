@@ -22,7 +22,7 @@ const SAMPLE_TYPES: { value: LabSampleType; label: string }[] = [
 const PRIORITIES: { value: LabPriority; label: string }[] = [
   { value: 'routine', label: 'Routine (Normal)' },
   { value: 'urgent', label: 'Urgente (24-48h)' },
-  { value: 'stat', label: 'STAT (Inmediato)' },
+  { value: 'emergency', label: 'Emergencia (Inmediato)' },
 ];
 
 export default function LabAppointmentForm({ data, onChange }: LabAppointmentFormProps) {
