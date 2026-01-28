@@ -66,9 +66,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const adminSupabase = createAdminClient();
     
+    // Eliminar campos de relaciones que no existen en la tabla
+    const { physio_treatment_types, ...cleanBody } = body;
+    
     const { data, error } = await adminSupabase
       .from('physio_techniques')
-      .insert(body)
+      .insert(cleanBody)
       .select()
       .single();
     
