@@ -30,43 +30,71 @@ export interface PatientListItem {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const adminSupabase = createAdminClient();
-  
-  // Obtener conteo de pacientes
-  const { count: totalPatients } = await adminSupabase
-    .from('patients')
-    .select('*', { count: 'exact', head: true });
+  try {
+    const adminSupabase = createAdminClient();
+    
+    // Obtener conteo de pacientes
+    const { count: totalPatients, error: patientsError } = await adminSupabase
+      .from('patients')
+      .select('*', { count: 'exact', head: true });
 
-  // Obtener citas de hoy (usando UTC para consistencia)
-  const now = new Date();
-  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const tomorrowUTC = new Date(todayUTC);
-  tomorrowUTC.setUTCDate(tomorrowUTC.getUTCDate() + 1);
+    if (patientsError) {
+      console.error('Error fetching totalPatients:', patientsError);
+    }
 
-  const { count: todayAppointments } = await adminSupabase
-    .from('appointments')
-    .select('*', { count: 'exact', head: true })
-    .gte('start_time', todayUTC.toISOString())
-    .lt('start_time', tomorrowUTC.toISOString());
+    // Obtener citas de hoy (usando UTC para consistencia)
+    const now = new Date();
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const tomorrowUTC = new Date(todayUTC);
+    tomorrowUTC.setUTCDate(tomorrowUTC.getUTCDate() + 1);
 
-  // Obtener recetas pendientes
-  const { count: pendingPrescriptions } = await adminSupabase
-    .from('prescriptions')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'pending');
+    const { count: todayAppointments, error: appointmentsError } = await adminSupabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .gte('start_time', todayUTC.toISOString())
+      .lt('start_time', tomorrowUTC.toISOString());
 
-  // Obtener items con stock bajo
-  const { count: lowStockItems } = await adminSupabase
-    .from('inventory')
-    .select('*', { count: 'exact', head: true })
-    .lte('quantity', 10);
+    if (appointmentsError) {
+      console.error('Error fetching todayAppointments:', appointmentsError);
+    }
 
-  return {
-    totalPatients: totalPatients || 0,
-    todayAppointments: todayAppointments || 0,
-    pendingPrescriptions: pendingPrescriptions || 0,
-    lowStockItems: lowStockItems || 0,
-  };
+    // Obtener recetas pendientes
+    const { count: pendingPrescriptions, error: prescriptionsError } = await adminSupabase
+      .from('prescriptions')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
+    if (prescriptionsError) {
+      console.error('Error fetching pendingPrescriptions:', prescriptionsError);
+    }
+
+    // Obtener items con stock bajo
+    const { count: lowStockItems, error: inventoryError } = await adminSupabase
+      .from('inventory')
+      .select('*', { count: 'exact', head: true })
+      .lte('quantity', 10);
+
+    if (inventoryError) {
+      console.error('Error fetching lowStockItems:', inventoryError);
+    }
+
+    console.log('Dashboard stats calculated:', {
+      totalPatients,
+      todayAppointments,
+      pendingPrescriptions,
+      lowStockItems
+    });
+
+    return {
+      totalPatients: totalPatients || 0,
+      todayAppointments: todayAppointments || 0,
+      pendingPrescriptions: pendingPrescriptions || 0,
+      lowStockItems: lowStockItems || 0,
+    };
+  } catch (error) {
+    console.error('Error in getDashboardStats:', error);
+    throw error;
+  }
 }
 
 export async function getTodayAppointments(): Promise<AppointmentListItem[]> {

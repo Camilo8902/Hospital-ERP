@@ -167,7 +167,7 @@ export default function NewPhysioSessionForm() {
           analysis: formData.analysis,
           plan: formData.plan,
           session_number: sessionNumber,
-          status: 'completed', // La sesión se crea como completada directamente
+          // status se omite porque la tabla physio_sessions no tiene esta columna
         })
         .select()
         .single();
