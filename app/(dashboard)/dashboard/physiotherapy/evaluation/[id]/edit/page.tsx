@@ -111,36 +111,51 @@ export default function EditPhysioEvaluationForm() {
     setError(null);
 
     try {
+      // Convertir strings a arrays para los campos que lo requieren
+      const allergiesArray = formData.allergies ? formData.allergies.split(',').map((a: string) => a.trim()).filter((a: string) => a) : [];
+      const contraindicationsArray = formData.contraindications ? formData.contraindications.split(',').map((c: string) => c.trim()).filter((c: string) => c) : [];
+      const shortTermGoalsArray = formData.short_term_goals ? formData.short_term_goals.split('\n').filter((g: string) => g.trim()) : [];
+      const longTermGoalsArray = formData.long_term_goals ? formData.long_term_goals.split('\n').filter((g: string) => g.trim()) : [];
+
+      const updateData: Record<string, unknown> = {
+        chief_complaint: formData.chief_complaint || null,
+        pain_location: formData.pain_location || null,
+        pain_duration: formData.pain_duration || null,
+        pain_type: formData.pain_type || null,
+        pain_scale_baseline: formData.pain_scale_baseline || 0,
+        pain_characteristics: formData.pain_characteristics || null,
+        surgical_history: formData.surgical_history || null,
+        traumatic_history: formData.traumatic_history || null,
+        medical_history: formData.medical_history || null,
+        family_history: formData.family_history || null,
+        allergies: allergiesArray,
+        contraindications: contraindicationsArray,
+        postural_evaluation: formData.postural_evaluation || null,
+        physical_examination: formData.physical_examination || null,
+        neurological_screening: formData.neurological_screening || null,
+        special_tests: formData.special_tests || null,
+        clinical_diagnosis: formData.clinical_diagnosis || null,
+        functional_limitations: formData.functional_limitations || null,
+        short_term_goals: shortTermGoalsArray,
+        long_term_goals: longTermGoalsArray,
+        patient_expectations: formData.patient_expectations || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Solo agregar notes si existe el campo
+      if ('notes' in (await supabase.from('physio_medical_records').select('*').limit(1).single()).data || false) {
+        updateData.notes = formData.notes || null;
+      }
+
       const { error: updateError } = await supabase
         .from('physio_medical_records')
-        .update({
-          chief_complaint: formData.chief_complaint,
-          pain_location: formData.pain_location,
-          pain_duration: formData.pain_duration,
-          pain_type: formData.pain_type,
-          pain_scale_baseline: formData.pain_scale_baseline,
-          pain_characteristics: formData.pain_characteristics,
-          surgical_history: formData.surgical_history,
-          traumatic_history: formData.traumatic_history,
-          medical_history: formData.medical_history,
-          family_history: formData.family_history,
-          allergies: formData.allergies ? formData.allergies.split(',').map(a => a.trim()).filter(Boolean) : [],
-          contraindications: formData.contraindications ? formData.contraindications.split(',').map(c => c.trim()).filter(Boolean) : [],
-          postural_evaluation: formData.postural_evaluation,
-          physical_examination: formData.physical_examination,
-          neurological_screening: formData.neurological_screening,
-          special_tests: formData.special_tests,
-          clinical_diagnosis: formData.clinical_diagnosis,
-          functional_limitations: formData.functional_limitations,
-          short_term_goals: formData.short_term_goals ? formData.short_term_goals.split('\n').filter(g => g.trim()) : [],
-          long_term_goals: formData.long_term_goals ? formData.long_term_goals.split('\n').filter(g => g.trim()) : [],
-          patient_expectations: formData.patient_expectations,
-          notes: formData.notes,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', evaluationId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Supabase error:', updateError);
+        throw new Error(updateError.message);
+      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -148,6 +163,7 @@ export default function EditPhysioEvaluationForm() {
       }, 2000);
 
     } catch (err) {
+      console.error('Error saving:', err);
       setError(err instanceof Error ? err.message : 'Error al guardar');
     } finally {
       setSaving(false);
