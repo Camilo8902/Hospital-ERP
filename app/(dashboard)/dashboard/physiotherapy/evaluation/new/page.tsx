@@ -167,7 +167,7 @@ export default function NewPhysioEvaluationForm() {
   const addROMMeasurement = () => {
     setFormData(prev => ({
       ...prev,
-      rom_measurements: [...prev.rom_measurements, { joint: '', movement: '', right_side: '', left_side: '', normal: '' }],
+      rom_measurements: [...prev.rom_measurements, { joint: null, movement: null, right_side: null, left_side: null, normal: null }],
     }));
   };
 
@@ -185,7 +185,7 @@ export default function NewPhysioEvaluationForm() {
   const addStrengthGrade = () => {
     setFormData(prev => ({
       ...prev,
-      strength_grade: [...prev.strength_grade, { muscle_group: '', right_side: 5, left_side: 5 }],
+      strength_grade: [...prev.strength_grade, { muscle_group: null, right_side: null, left_side: null }],
     }));
   };
 
