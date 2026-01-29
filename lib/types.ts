@@ -23,6 +23,7 @@ export interface Profile {
 export interface Patient {
   id: string;
   medical_record_number: string;
+  dni?: number | null;
   first_name: string;
   last_name: string;
   email?: string | null;

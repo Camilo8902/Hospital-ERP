@@ -46,6 +46,7 @@ export async function createPatient(formData: FormData): Promise<{ success: bool
   
   const firstName = formData.get('first_name') as string;
   const lastName = formData.get('last_name') as string;
+  const dni = formData.get('dni') as string;
   const email = formData.get('email') as string;
   const phone = formData.get('phone') as string;
   const dob = formData.get('dob') as string;
@@ -61,8 +62,8 @@ export async function createPatient(formData: FormData): Promise<{ success: bool
   const notes = formData.get('notes') as string;
 
   // Validaciones
-  if (!firstName || !lastName || !phone || !dob) {
-    return { success: false, error: 'Por favor completa todos los campos requeridos' };
+  if (!firstName || !lastName || !dni || !phone || !dob) {
+    return { success: false, error: 'Por favor completa todos los campos requeridos (incluido DNI)' };
   }
 
   try {
@@ -75,6 +76,7 @@ export async function createPatient(formData: FormData): Promise<{ success: bool
     const { data, error: insertError } = await adminSupabase
       .from('patients')
       .insert({
+        dni: parseInt(dni) || null,
         first_name: firstName,
         last_name: lastName,
         email: email || null,

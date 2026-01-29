@@ -338,7 +338,7 @@ export default function PhysiotherapyDashboard() {
             console.log('[Dashboard] Buscando pacientes con IDs:', recentPatientIds);
             const { data: recentPatientsData, error: recentPatientsError } = await supabase
               .from('patients')
-              .select('id, first_name, last_name, dni')
+              .select('id, first_name, last_name')
               .in('id', recentPatientIds);
             console.log('[Dashboard] Pacientes encontrados:', recentPatientsData?.length || 0, recentPatientsError || 'ok');
             if (recentPatientsData) {
