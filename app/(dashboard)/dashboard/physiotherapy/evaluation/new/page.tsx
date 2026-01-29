@@ -61,6 +61,7 @@ export default function NewPhysioEvaluationForm() {
   
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingConsent, setUploadingConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [patientId, setPatientId] = useState<string | null>(searchParams.get('patient_id'));
@@ -116,6 +117,8 @@ export default function NewPhysioEvaluationForm() {
     
     // Consentimiento
     informed_consent_signed: false,
+    informed_consent_file_url: '',
+    informed_consent_file_name: '',
     
     // Notas
     notes: '',
@@ -197,6 +200,56 @@ export default function NewPhysioEvaluationForm() {
     setFormData(prev => ({ ...prev, strength_grade: updated }));
   };
 
+  // Subir archivo del consentimiento informado
+  const handleConsentFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingConsent(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `consent-files/${fileName}`;
+
+      // Subir archivo a Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('consent-files')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Obtener URL pública (o signed URL para bucket privado)
+      const { data: { publicUrl } } = supabase.storage
+        .from('consent-files')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({
+        ...prev,
+        informed_consent_file_url: publicUrl,
+        informed_consent_file_name: file.name,
+        informed_consent_signed: true // Auto-firmar cuando se sube el archivo
+      }));
+    } catch (error) {
+      console.error('Error al subir archivo:', error);
+      setError('Error al subir el archivo del consentimiento');
+    } finally {
+      setUploadingConsent(false);
+    }
+  };
+
+  // Eliminar archivo del consentimiento
+  const handleRemoveConsentFile = () => {
+    setFormData(prev => ({
+      ...prev,
+      informed_consent_file_url: '',
+      informed_consent_file_name: '',
+      informed_consent_signed: false
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -245,6 +298,8 @@ export default function NewPhysioEvaluationForm() {
           patient_expectations: formData.patient_expectations,
           informed_consent_signed: formData.informed_consent_signed,
           informed_consent_date: formData.informed_consent_signed ? new Date().toISOString() : null,
+          informed_consent_file_url: formData.informed_consent_file_url || null,
+          informed_consent_file_name: formData.informed_consent_file_name || null,
           status: 'active',
         })
         .select()
@@ -985,7 +1040,14 @@ export default function NewPhysioEvaluationForm() {
               </div>
 
               {/* Consentimiento informado */}
-              <div className="border rounded-lg p-4 bg-purple-50">
+              <div className="border rounded-lg p-4 bg-purple-50 space-y-4">
+                <div>
+                  <p className="font-medium text-gray-900 mb-2">Consentimiento informado</p>
+                  <p className="text-sm text-gray-500">
+                    El paciente debe leer y firmar el consentimiento informado para el tratamiento de fisioterapia.
+                    Adjunte el documento escaneado con la firma del paciente.
+                  </p>
+                </div>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
