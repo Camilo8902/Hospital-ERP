@@ -20,39 +20,31 @@ import {
   ClipboardList
 } from 'lucide-react';
 import Link from 'next/link';
+import { VASScale, StrengthGrade } from '@/components/physio';
 
-const painTypes = [
-  'Agudo', 'Crónico', 'Punzante', 'Sordo', 'Ardor', 'Hormigueo', 
-  'Entumecimiento', 'Presión', 'Tensión', 'Otro'
-];
+  const painTypes = [
+    'Agudo', 'Crónico', 'Punzante', 'Sordo', 'Ardor', 'Hormigueo', 
+    'Entumecimiento', 'Presión', 'Tensión', 'Otro'
+  ];
 
-const painDurations = [
-  'Menos de 1 semana', '1-4 semanas', '1-3 meses', '3-6 meses', 'Más de 6 meses'
-];
+  const painDurations = [
+    'Menos de 1 semana', '1-4 semanas', '1-3 meses', '3-6 meses', 'Más de 6 meses'
+  ];
 
-const bodyRegions = [
-  { value: 'cervical', label: 'Cervical (Cuello)' },
-  { value: 'shoulder', label: 'Hombro' },
-  { value: 'elbow', label: 'Codo' },
-  { value: 'wrist', label: 'Muñeca' },
-  { value: 'hand', label: 'Mano' },
-  { value: 'lumbar', label: 'Lumbar' },
-  { value: 'thoracic', label: 'Torácica' },
-  { value: 'hip', label: 'Cadera' },
-  { value: 'knee', label: 'Rodilla' },
-  { value: 'ankle', label: 'Tobillo' },
-  { value: 'foot', label: 'Pie' },
-  { value: 'other', label: 'Otra' },
-];
-
-const strengthGrades = [
-  { value: 0, label: '0 - Parálisis total' },
-  { value: 1, label: '1 - Contracción visible' },
-  { value: 2, label: '2 - Movimiento sin gravedad' },
-  { value: 3, label: '3 - Movimiento contra gravedad' },
-  { value: 4, label: '4 - Movimiento contra resistencia' },
-  { value: 5, label: '5 - Fuerza normal' },
-];
+  const bodyRegions = [
+    { value: 'cervical', label: 'Cervical (Cuello)' },
+    { value: 'shoulder', label: 'Hombro' },
+    { value: 'elbow', label: 'Codo' },
+    { value: 'wrist', label: 'Muñeca' },
+    { value: 'hand', label: 'Mano' },
+    { value: 'lumbar', label: 'Lumbar' },
+    { value: 'thoracic', label: 'Torácica' },
+    { value: 'hip', label: 'Cadera' },
+    { value: 'knee', label: 'Rodilla' },
+    { value: 'ankle', label: 'Tobillo' },
+    { value: 'foot', label: 'Pie' },
+    { value: 'other', label: 'Otra' },
+  ];
 
 export default function NewPhysioEvaluationForm() {
   const router = useRouter();
@@ -521,26 +513,11 @@ console.log('Enviando datos:', {
                 </div>
               </div>
 
-              <div>
-                <label className="label mb-1.5">Nivel de dolor inicial (EVA 0-10)</label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    name="pain_scale_baseline"
-                    min="0"
-                    max="10"
-                    value={formData.pain_scale_baseline}
-                    onChange={handleChange}
-                    className="flex-1"
-                  />
-                  <span className={`w-12 h-12 flex items-center justify-center rounded-full font-bold text-white ${
-                    formData.pain_scale_baseline >= 7 ? 'bg-red-500' :
-                    formData.pain_scale_baseline >= 4 ? 'bg-yellow-500' : 'bg-green-500'
-                  }`}>
-                    {formData.pain_scale_baseline}
-                  </span>
-                </div>
-              </div>
+              <VASScale
+                value={formData.pain_scale_baseline}
+                onChange={(value) => setFormData(prev => ({ ...prev, pain_scale_baseline: value }))}
+                label="Nivel de dolor inicial"
+              />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -814,34 +791,44 @@ console.log('Enviando datos:', {
                 {formData.strength_grade.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">No hay registros de fuerza</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {formData.strength_grade.map((grade, index) => (
-                      <div key={index} className="flex items-center gap-2 flex-wrap">
-                        <input
-                          type="text"
-                          value={grade.muscle_group}
-                          onChange={(e) => updateStrengthGrade(index, 'muscle_group', e.target.value)}
-                          className="input flex-1"
-                          placeholder="Grupo muscular"
+                      <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <input
+                            type="text"
+                            value={grade.muscle_group}
+                            onChange={(e) => updateStrengthGrade(index, 'muscle_group', e.target.value)}
+                            className="input flex-1"
+                            placeholder="Grupo muscular"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeStrengthGrade(index)}
+                            className="ml-2 text-red-500 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <StrengthGrade
+                          value={grade.right_side || 0}
+                          onChange={(value) => updateStrengthGrade(index, 'right_side', value)}
+                          label="Derecho"
+                          side="right"
                         />
-                        <select
-                          value={grade.right_side}
-                          onChange={(e) => updateStrengthGrade(index, 'right_side', parseInt(e.target.value))}
-                          className="input w-24"
-                        >
-                          {strengthGrades.map(g => (
-                            <option key={g.value} value={g.value}>{g.value}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={grade.left_side}
-                          onChange={(e) => updateStrengthGrade(index, 'left_side', parseInt(e.target.value))}
-                          className="input w-24"
-                        >
-                          {strengthGrades.map(g => (
-                            <option key={g.value} value={g.value}>{g.value}</option>
-                          ))}
-                        </select>
+                        <div className="mt-2">
+                          <StrengthGrade
+                            value={grade.left_side || 0}
+                            onChange={(value) => updateStrengthGrade(index, 'left_side', value)}
+                            label="Izquierdo"
+                            side="left"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
                         <button
                           type="button"
                           onClick={() => removeStrengthGrade(index)}
