@@ -114,9 +114,6 @@ export default function NewPhysioEvaluationForm() {
     long_term_goals: '',
     patient_expectations: '',
     
-    // Consentimiento
-    informed_consent_signed: false,
-    
     // Notas
     notes: '',
   });
@@ -243,8 +240,6 @@ export default function NewPhysioEvaluationForm() {
           short_term_goals: formData.short_term_goals ? formData.short_term_goals.split('\n').filter(g => g.trim()) : [],
           long_term_goals: formData.long_term_goals ? formData.long_term_goals.split('\n').filter(g => g.trim()) : [],
           patient_expectations: formData.patient_expectations,
-          informed_consent_signed: formData.informed_consent_signed,
-          informed_consent_date: formData.informed_consent_signed ? new Date().toISOString() : null,
           status: 'active',
         })
         .select()
@@ -984,25 +979,6 @@ export default function NewPhysioEvaluationForm() {
                 />
               </div>
 
-              {/* Consentimiento informado */}
-              <div className="border rounded-lg p-4 bg-purple-50">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.informed_consent_signed}
-                    onChange={(e) => handleCheckboxChange('informed_consent_signed', e.target.checked)}
-                    className="mt-1 w-5 h-5 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">Consentimiento informado firmado</p>
-                    <p className="text-sm text-gray-500">
-                      El paciente ha leído y firmado el consentimiento informado para el tratamiento de fisioterapia.
-                      Se debe conservar el documento físico o digital firmado.
-                    </p>
-                  </div>
-                </label>
-              </div>
-
               <div className="flex justify-between">
                 <button
                   type="button"
@@ -1021,7 +997,7 @@ export default function NewPhysioEvaluationForm() {
                   </button>
                   <button
                     type="submit"
-                    disabled={saving || !formData.informed_consent_signed}
+                    disabled={saving}
                     className="btn-primary btn-md"
                   >
                     {saving ? (
