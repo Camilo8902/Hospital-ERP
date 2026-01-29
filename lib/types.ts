@@ -467,6 +467,45 @@ export interface PatientNote {
 }
 
 // ============================================
+// TIPOS PARA DERIVACIONES CLÍNICAS
+// ============================================
+
+export interface ClinicalReference {
+  id: string;
+  patient_id: string;
+  referring_doctor_id?: string | null;
+  referring_department_id?: string | null;
+  target_department_id: string;
+  reference_type: 'evaluation' | 'treatment' | 'procedure' | 'consultation';
+  clinical_diagnosis: string;
+  icd10_codes?: string[];
+  priority: 'routine' | 'urgent' | 'emergency';
+  notes?: string | null;
+  status: 'pending' | 'accepted' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  // Campos expandidos para UI
+  patient_name?: string;
+  patient_dni?: number;
+  medical_record_number?: string;
+  referring_department_name?: string;
+  target_department_name?: string;
+  referring_doctor_name?: string;
+}
+
+export interface CreateReferenceInput {
+  patient_id: string;
+  referring_doctor_id?: string;
+  referring_department_id?: string;
+  target_department_id: string;
+  reference_type?: 'evaluation' | 'treatment' | 'procedure' | 'consultation';
+  clinical_diagnosis: string;
+  icd10_codes?: string[];
+  priority?: 'routine' | 'urgent' | 'emergency';
+  notes?: string;
+}
+
+// ============================================
 // TIPOS PARA PUNTO DE VENTA (POS) DE FARMACIA
 // ============================================
 

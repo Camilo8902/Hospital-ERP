@@ -126,10 +126,17 @@ export default function NewPhysioEvaluationForm() {
     const fetchPatients = async () => {
       const { data } = await supabase
         .from('patients')
-        .select('id, full_name, dni, phone')
-        .order('full_name');
+        .select('id, first_name, last_name, dni, phone')
+        .order('last_name');
       
-      if (data) setPatients(data);
+      if (data) {
+        // Transformar para tener full_name computado
+        const patientsWithFullName = data.map(p => ({
+          ...p,
+          full_name: `${p.first_name} ${p.last_name}`
+        }));
+        setPatients(patientsWithFullName);
+      }
     };
     
     fetchPatients();
