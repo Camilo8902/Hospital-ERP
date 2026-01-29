@@ -237,7 +237,7 @@ export default function NewPhysioPlanPage() {
                   disabled={!formData.patient_id}
                 >
                   <option value="">Sin evaluación previa...</option>
-                  {evaluations.map((eval) => (
+                  {evaluations.map((evaluation) => (
                     <option key={eval.id} value={eval.id}>
                       {new Date(eval.created_at).toLocaleDateString()} - {eval.clinical_diagnosis?.substring(0, 50) || 'Sin diagnóstico'}
                     </option>
