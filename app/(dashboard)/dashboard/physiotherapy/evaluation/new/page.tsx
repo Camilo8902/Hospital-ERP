@@ -829,18 +829,6 @@ console.log('Enviando datos:', {
                   </div>
                 )}
               </div>
-                        <button
-                          type="button"
-                          onClick={() => removeStrengthGrade(index)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
