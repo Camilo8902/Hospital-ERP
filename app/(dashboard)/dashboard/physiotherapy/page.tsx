@@ -335,10 +335,12 @@ export default function PhysiotherapyDashboard() {
           let recentTherapistMap: Record<string, any> = {};
           
           if (recentPatientIds.length > 0) {
-            const { data: recentPatientsData } = await supabase
+            console.log('[Dashboard] Buscando pacientes con IDs:', recentPatientIds);
+            const { data: recentPatientsData, error: recentPatientsError } = await supabase
               .from('patients')
               .select('id, full_name, dni, first_name, last_name')
               .in('id', recentPatientIds);
+            console.log('[Dashboard] Pacientes encontrados:', recentPatientsData?.length || 0, recentPatientsError || 'ok');
             if (recentPatientsData) {
               recentPatientMap = recentPatientsData.reduce<Record<string, any>>((acc, p) => {
                 acc[p.id] = p;
@@ -348,10 +350,12 @@ export default function PhysiotherapyDashboard() {
           }
           
           if (recentTherapistIds.length > 0) {
-            const { data: recentTherapistsData } = await supabase
+            console.log('[Dashboard] Buscando terapeutas con IDs:', recentTherapistIds);
+            const { data: recentTherapistsData, error: recentTherapistsError } = await supabase
               .from('profiles')
               .select('id, full_name, first_name, last_name')
               .in('id', recentTherapistIds);
+            console.log('[Dashboard] Terapeutas encontrados:', recentTherapistsData?.length || 0, recentTherapistsError || 'ok');
             if (recentTherapistsData) {
               recentTherapistMap = recentTherapistsData.reduce<Record<string, any>>((acc, t) => {
                 acc[t.id] = t;
