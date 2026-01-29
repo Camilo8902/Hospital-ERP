@@ -260,7 +260,11 @@ export default function NewPhysioEvaluationForm() {
       if (!user) {
         throw new Error('Usuario no autenticado');
       }
-
+  // Log para debug
+console.log('Enviando datos:', {
+  rom_measurements: formData.rom_measurements,
+  strength_grade: formData.strength_grade
+    });
       // Crear el registro médico de fisioterapia
       const { data: record, error: insertError } = await supabase
         .from('physio_medical_records')
@@ -1107,3 +1111,4 @@ export default function NewPhysioEvaluationForm() {
     </div>
   );
 }
+
