@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getCurrentUser } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 // POST /api/physio/plans/[id]/finalize - Culminar plan de tratamiento
@@ -6,11 +6,11 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { id } = await params;
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -116,7 +116,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { id } = await params;
 
   const { data, error } = await supabase

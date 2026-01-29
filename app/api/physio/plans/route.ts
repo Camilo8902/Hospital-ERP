@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getCurrentUser } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET /api/physio/plans - Listar planes de tratamiento
 export async function GET(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { searchParams } = new URL(request.url);
   
   const patientId = searchParams.get('patient_id');
@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
 
 // POST /api/physio/plans - Crear plan de tratamiento
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
