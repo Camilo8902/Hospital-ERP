@@ -17,6 +17,7 @@ export default function EditPatientPage({ patient }: EditPatientPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
+    dni: patient.dni?.toString() ?? '',
     first_name: patient.first_name,
     last_name: patient.last_name,
     email: patient.email ?? '',
@@ -49,6 +50,7 @@ export default function EditPatientPage({ patient }: EditPatientPageProps) {
 
     try {
       const formDataToSend = new FormData();
+      formDataToSend.append('dni', formData.dni);
       formDataToSend.append('first_name', formData.first_name);
       formDataToSend.append('last_name', formData.last_name);
       formDataToSend.append('email', formData.email);
@@ -110,6 +112,18 @@ export default function EditPatientPage({ patient }: EditPatientPageProps) {
             <h2 className="text-lg font-semibold text-gray-900">Información Personal</h2>
           </div>
           <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label mb-1.5">DNI / Cédula *</label>
+              <input
+                type="text"
+                name="dni"
+                value={formData.dni}
+                onChange={handleChange}
+                className="input"
+                placeholder="12345678"
+                required
+              />
+            </div>
             <div>
               <label className="label mb-1.5">Nombre(s) *</label>
               <input

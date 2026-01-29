@@ -40,6 +40,27 @@ export async function getPatientById(id: string): Promise<Patient | null> {
   return data as Patient;
 }
 
+// Buscar paciente por DNI
+export async function getPatientByDni(dni: string): Promise<Patient | null> {
+  const adminSupabase = createAdminClient();
+  
+  // El DNI es numeric en la tabla
+  const dniNumber = parseInt(dni);
+  
+  const { data, error } = await adminSupabase
+    .from('patients')
+    .select('*')
+    .eq('dni', dniNumber)
+    .single();
+
+  if (error) {
+    console.error('Error al buscar paciente por DNI:', error);
+    return null;
+  }
+
+  return data as Patient;
+}
+
 // Crear un nuevo paciente
 export async function createPatient(formData: FormData): Promise<{ success: boolean; error?: string; patientId?: string }> {
   const adminSupabase = createAdminClient();
@@ -123,6 +144,7 @@ export async function updatePatient(
   
   const firstName = formData.get('first_name') as string;
   const lastName = formData.get('last_name') as string;
+  const dni = formData.get('dni') as string;
   const email = formData.get('email') as string;
   const phone = formData.get('phone') as string;
   const dob = formData.get('dob') as string;
@@ -151,6 +173,7 @@ export async function updatePatient(
     const { error: updateError } = await adminSupabase
       .from('patients')
       .update({
+        dni: parseInt(dni) || null,
         first_name: firstName,
         last_name: lastName,
         email: email || null,
