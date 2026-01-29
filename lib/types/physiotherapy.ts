@@ -38,6 +38,8 @@ export interface PhysioMedicalRecord {
   short_term_goals?: string[];
   long_term_goals?: string[];
   patient_expectations?: string;
+  informed_consent_signed?: boolean;
+  informed_consent_date?: string;
   status: string;
   created_at: string;
   updated_at: string;
