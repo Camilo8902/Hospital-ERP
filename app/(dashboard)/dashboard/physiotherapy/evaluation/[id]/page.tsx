@@ -288,13 +288,21 @@ export default function PhysioEvaluationDetailPage() {
             <div>
               <p className="text-sm text-gray-500 mb-1">Alergias</p>
               <p className="text-gray-900">
-                {evaluation.allergies?.length ? evaluation.allergies.join(', ') : '-'}
+                {evaluation.allergies 
+                  ? (Array.isArray(evaluation.allergies) 
+                      ? evaluation.allergies.join(', ') 
+                      : JSON.stringify(evaluation.allergies))
+                  : '-'}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500 mb-1">Contraindicaciones</p>
               <p className="text-gray-900">
-                {evaluation.contraindications?.length ? evaluation.contraindications.join(', ') : '-'}
+                {evaluation.contraindications 
+                  ? (Array.isArray(evaluation.contraindications) 
+                      ? evaluation.contraindications.join(', ') 
+                      : JSON.stringify(evaluation.contraindications))
+                  : '-'}
               </p>
             </div>
           </div>
@@ -330,7 +338,7 @@ export default function PhysioEvaluationDetailPage() {
       </div>
 
       {/* ROM Measurements */}
-      {evaluation.rom_measurements?.length > 0 && (
+      {Array.isArray(evaluation.rom_measurements) && evaluation.rom_measurements.length > 0 && (
         <div className="card">
           <div className="card-header">
             <h2 className="text-lg font-semibold text-gray-900">Rango de Movimiento</h2>
@@ -363,7 +371,7 @@ export default function PhysioEvaluationDetailPage() {
       )}
 
       {/* Strength Grade */}
-      {evaluation.strength_grade?.length > 0 && (
+      {Array.isArray(evaluation.strength_grade) && evaluation.strength_grade.length > 0 && (
         <div className="card">
           <div className="card-header">
             <h2 className="text-lg font-semibold text-gray-900">Fuerza Muscular</h2>
@@ -408,7 +416,7 @@ export default function PhysioEvaluationDetailPage() {
           <div>
             <p className="text-sm text-gray-500 mb-1">Objetivos a corto plazo</p>
             <ul className="list-disc list-inside text-gray-900">
-              {evaluation.short_term_goals?.length ? (
+              {Array.isArray(evaluation.short_term_goals) && evaluation.short_term_goals.length ? (
                 evaluation.short_term_goals.map((goal: string, i: number) => (
                   <li key={i}>{goal}</li>
                 ))
@@ -420,7 +428,7 @@ export default function PhysioEvaluationDetailPage() {
           <div>
             <p className="text-sm text-gray-500 mb-1">Objetivos a largo plazo</p>
             <ul className="list-disc list-inside text-gray-900">
-              {evaluation.long_term_goals?.length ? (
+              {Array.isArray(evaluation.long_term_goals) && evaluation.long_term_goals.length ? (
                 evaluation.long_term_goals.map((goal: string, i: number) => (
                   <li key={i}>{goal}</li>
                 ))
