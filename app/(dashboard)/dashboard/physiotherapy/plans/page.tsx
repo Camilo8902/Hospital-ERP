@@ -18,15 +18,17 @@ import {
 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
-  active: 'bg-green-100 text-green-800',
-  completed: 'bg-blue-100 text-blue-800',
+  indicated: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-green-100 text-green-800',
+  completed: 'bg-purple-100 text-purple-800',
   paused: 'bg-yellow-100 text-yellow-800',
   cancelled: 'bg-red-100 text-red-800',
 };
 
 const statusLabels: Record<string, string> = {
-  active: 'Activo',
-  completed: 'Completado',
+  indicated: 'Indicado',
+  in_progress: 'En Proceso',
+  completed: 'Culminado',
   paused: 'Pausado',
   cancelled: 'Cancelado',
 };
@@ -117,8 +119,9 @@ export default function PhysioPlansPage() {
                 className="input w-40"
               >
                 <option value="">Todos los estados</option>
-                <option value="active">Activo</option>
-                <option value="completed">Completado</option>
+                <option value="indicated">Indicado</option>
+                <option value="in_progress">En Proceso</option>
+                <option value="completed">Culminado</option>
                 <option value="paused">Pausado</option>
                 <option value="cancelled">Cancelado</option>
               </select>
@@ -128,7 +131,7 @@ export default function PhysioPlansPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="card">
           <div className="card-body">
             <p className="text-sm text-gray-500">Total Planes</p>
@@ -137,16 +140,24 @@ export default function PhysioPlansPage() {
         </div>
         <div className="card">
           <div className="card-body">
-            <p className="text-sm text-gray-500">Activos</p>
-            <p className="text-2xl font-bold text-green-600">
-              {plans.filter((p: any) => p.status === 'active').length}
+            <p className="text-sm text-gray-500">Indicados</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {plans.filter((p: any) => p.status === 'indicated').length}
             </p>
           </div>
         </div>
         <div className="card">
           <div className="card-body">
-            <p className="text-sm text-gray-500">Completados</p>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-sm text-gray-500">En Proceso</p>
+            <p className="text-2xl font-bold text-green-600">
+              {plans.filter((p: any) => p.status === 'in_progress').length}
+            </p>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body">
+            <p className="text-sm text-gray-500">Culminados</p>
+            <p className="text-2xl font-bold text-purple-600">
               {plans.filter((p: any) => p.status === 'completed').length}
             </p>
           </div>

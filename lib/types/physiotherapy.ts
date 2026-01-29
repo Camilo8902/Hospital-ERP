@@ -108,6 +108,7 @@ export interface PhysioSession {
 export interface PhysioTreatmentPlan {
   id: string;
   patient_id: string;
+  medical_record_id?: string;  // Nuevo campo para vincular evaluación
   prescribing_doctor_id?: string;
   department_id?: string;
   diagnosis_code?: string;
@@ -117,7 +118,8 @@ export interface PhysioTreatmentPlan {
   start_date: string;
   expected_end_date?: string;
   actual_end_date?: string;
-  status: 'active' | 'completed' | 'paused' | 'cancelled';
+  // Estados actualizados incluyendo 'indicated' e 'in_progress'
+  status: 'indicated' | 'in_progress' | 'completed' | 'paused' | 'cancelled';
   sessions_per_week?: number;
   total_sessions_prescribed?: number;
   sessions_completed?: number;
@@ -134,6 +136,23 @@ export interface PhysioTreatmentPlan {
   prescribers?: TherapistSummary;
   sessions?: PhysioSession[];
 }
+
+// Labels para estados del plan
+export const planStatusLabels: Record<string, string> = {
+  indicated: 'Indicado',
+  in_progress: 'En Proceso',
+  completed: 'Culminado',
+  paused: 'Pausado',
+  cancelled: 'Cancelado',
+};
+
+export const planStatusColors: Record<string, string> = {
+  indicated: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-green-100 text-green-800',
+  completed: 'bg-purple-100 text-purple-800',
+  paused: 'bg-yellow-100 text-yellow-800',
+  cancelled: 'bg-red-100 text-red-800',
+};
 
 // Medida de resultado clínico
 export interface OutcomeMeasure {

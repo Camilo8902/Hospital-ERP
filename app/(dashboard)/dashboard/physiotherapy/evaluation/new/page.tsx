@@ -114,6 +114,15 @@ export default function NewPhysioEvaluationForm() {
     
     // Notas
     notes: '',
+
+    // Configuración de plan de tratamiento (nueva funcionalidad)
+    activate_treatment_plan: false,
+    plan_type: 'rehabilitation' as const,
+    sessions_per_week: 3,
+    total_sessions_prescribed: 10,
+    expected_end_date: '',
+    baseline_rom: '',
+    baseline_functional_score: null as number | null,
   });
 
   // Cargar pacientes
@@ -305,11 +314,54 @@ console.log('Enviando datos:', {
         throw new Error(insertError.message);
       }
 
+      // 2. Si está activado, crear el plan de tratamiento
+      let planId = null;
+      if (formData.activate_treatment_plan) {
+        try {
+          const planData = {
+            patient_id: formData.patient_id,
+            medical_record_id: record.id,  // Vincular a la evaluación
+            therapist_id: user.id,
+            diagnosis_code: formData.icd10_codes?.split(',')[0]?.trim() || null,
+            diagnosis_description: formData.clinical_diagnosis,
+            plan_type: formData.plan_type,
+            clinical_objective: formData.clinical_diagnosis,
+            start_date: new Date().toISOString().split('T')[0],
+            expected_end_date: formData.expected_end_date || null,
+            sessions_per_week: formData.sessions_per_week,
+            total_sessions_prescribed: formData.total_sessions_prescribed,
+            sessions_completed: 0,
+            baseline_rom: formData.baseline_rom || null,
+            baseline_functional_score: formData.baseline_functional_score,
+            status: 'indicated',  // Estado inicial: INDICADO
+            notes: formData.notes || null,
+          };
+
+          const { data: plan, error: planError } = await supabase
+            .from('physio_treatment_plans')
+            .insert(planData)
+            .select()
+            .single();
+
+          if (planError) {
+            console.error('Error al crear plan:', planError);
+          } else {
+            planId = plan.id;
+          }
+        } catch (planErr) {
+          console.error('Error creando plan:', planErr);
+        }
+      }
+
       setSuccess(true);
       
       // Redireccionar después de 2 segundos
       setTimeout(() => {
-        router.push(`/dashboard/physiotherapy/evaluation/${record.id}`);
+        if (planId) {
+          router.push(`/dashboard/physiotherapy/plans/${planId}`);
+        } else {
+          router.push(`/dashboard/physiotherapy/evaluation/${record.id}`);
+        }
       }, 2000);
 
     } catch (err) {
@@ -1016,6 +1068,120 @@ console.log('Enviando datos:', {
                   className="input min-h-[80px]"
                   placeholder="Notas adicionales relevantes..."
                 />
+              </div>
+
+              {/* Nueva sección: Activar Plan de Tratamiento */}
+              <div className="border rounded-lg p-4 bg-blue-50 space-y-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.activate_treatment_plan}
+                    onChange={(e) => handleCheckboxChange('activate_treatment_plan', e.target.checked)}
+                    className="mt-1 w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="font-medium text-gray-900">Crear Plan de Tratamiento</p>
+                    <p className="text-sm text-gray-500">
+                      Al activar esta opción, se creará automáticamente un plan de tratamiento 
+                      con los datos de esta evaluación.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Configuración del plan (solo si está activado) */}
+                {formData.activate_treatment_plan && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="label mb-1.5">Tipo de Plan *</label>
+                      <select
+                        name="plan_type"
+                        value={formData.plan_type}
+                        onChange={handleChange}
+                        className="input"
+                      >
+                        <option value="rehabilitation">Rehabilitación</option>
+                        <option value="maintenance">Mantenimiento</option>
+                        <option value="preventive">Preventivo</option>
+                        <option value="performance">Rendimiento</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="label mb-1.5">Sesiones por semana *</label>
+                      <input
+                        type="number"
+                        name="sessions_per_week"
+                        value={formData.sessions_per_week}
+                        onChange={handleChange}
+                        min="1"
+                        max="7"
+                        className="input"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="label mb-1.5">Total de sesiones prescritas *</label>
+                      <input
+                        type="number"
+                        name="total_sessions_prescribed"
+                        value={formData.total_sessions_prescribed}
+                        onChange={handleChange}
+                        min="1"
+                        max="100"
+                        className="input"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="label mb-1.5">Fecha estimada de finalización</label>
+                      <input
+                        type="date"
+                        name="expected_end_date"
+                        value={formData.expected_end_date}
+                        onChange={handleChange}
+                        className="input"
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className="label mb-1.5">Objetivo clínico principal</label>
+                      <textarea
+                        name="clinical_objective"
+                        value={formData.clinical_diagnosis}
+                        onChange={handleChange}
+                        className="input min-h-[80px]"
+                        placeholder="Objetivo principal del tratamiento (se pre-llena con el diagnóstico)..."
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Se pre-llena automáticamente con el diagnóstico clínico.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="label mb-1.5">ROM basal (opcional)</label>
+                      <input
+                        type="text"
+                        name="baseline_rom"
+                        value={formData.baseline_rom}
+                        onChange={handleChange}
+                        className="input"
+                        placeholder="Ej: Flexión 90°, Extensión 0°"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="label mb-1.5">Score funcional inicial</label>
+                      <input
+                        type="number"
+                        name="baseline_functional_score"
+                        value={formData.baseline_functional_score || ''}
+                        onChange={handleChange}
+                        className="input"
+                        placeholder="0-100"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Consentimiento informado */}
