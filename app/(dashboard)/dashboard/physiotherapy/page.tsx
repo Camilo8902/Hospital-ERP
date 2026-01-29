@@ -338,7 +338,7 @@ export default function PhysiotherapyDashboard() {
             console.log('[Dashboard] Buscando pacientes con IDs:', recentPatientIds);
             const { data: recentPatientsData, error: recentPatientsError } = await supabase
               .from('patients')
-              .select('id, full_name, dni, first_name, last_name')
+              .select('id, first_name, last_name, dni')
               .in('id', recentPatientIds);
             console.log('[Dashboard] Pacientes encontrados:', recentPatientsData?.length || 0, recentPatientsError || 'ok');
             if (recentPatientsData) {
@@ -353,7 +353,7 @@ export default function PhysiotherapyDashboard() {
             console.log('[Dashboard] Buscando terapeutas con IDs:', recentTherapistIds);
             const { data: recentTherapistsData, error: recentTherapistsError } = await supabase
               .from('profiles')
-              .select('id, full_name, first_name, last_name')
+              .select('id, full_name')
               .in('id', recentTherapistIds);
             console.log('[Dashboard] Terapeutas encontrados:', recentTherapistsData?.length || 0, recentTherapistsError || 'ok');
             if (recentTherapistsData) {
@@ -374,9 +374,9 @@ export default function PhysiotherapyDashboard() {
               session_date: session.session_date || new Date().toISOString().split('T')[0],
               session_time: session.session_time || '08:00:00',
               patient_id: session.patient_id || '',
-              patient_name: patient.full_name || patient.first_name + ' ' + patient.last_name || 'Paciente未知',
+              patient_name: (patient.first_name || '') + ' ' + (patient.last_name || '') || 'Paciente未知',
               patient_dni: patient.dni || 'N/A',
-              therapist_name: therapist.full_name || therapist.first_name + ' ' + therapist.last_name || 'Por asignar',
+              therapist_name: therapist.full_name || 'Por asignar',
               status: status,
               pain_level: session.pain_level || 0,
             };
