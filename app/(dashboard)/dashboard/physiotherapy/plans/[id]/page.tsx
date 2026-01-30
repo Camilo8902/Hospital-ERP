@@ -58,7 +58,7 @@ export default function PhysioPlanDetailPage() {
         .from('physio_treatment_plans')
         .select(`
           *,
-          patients (id, first_name, last_name, dni, phone, date_of_birth)
+          patients (id, first_name, last_name, dni, phone, dob)
         `)
         .eq('id', planId)
         .single();
