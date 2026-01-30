@@ -161,7 +161,7 @@ export default function PhysioCatalogsPage() {
     t.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredEquipment = equipment.filter(e =>
+  const filteredEquipment = (equipment || []).filter(e =>
     e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     e.brand?.toLowerCase().includes(searchQuery.toLowerCase())
   );

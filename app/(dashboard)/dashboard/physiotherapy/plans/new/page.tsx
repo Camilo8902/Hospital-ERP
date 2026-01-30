@@ -76,14 +76,14 @@ export default function NewPhysioPlanPage() {
 
     // Cargar equipos disponibles
     const fetchEquipment = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('physio_equipment')
         .select('id, name, brand, model, status, parameter_fields')
         .eq('is_active', true)
-        .in('status', ['available', 'in_use'])
+        .or('status.eq.available,status.eq.in_use')
         .order('name');
       
-      if (data) setEquipment(data);
+      if (data && !error) setEquipment(data);
     };
     fetchEquipment();
   }, []);
