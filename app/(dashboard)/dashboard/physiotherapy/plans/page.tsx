@@ -47,6 +47,7 @@ export default function PhysioPlansPage() {
 
   const fetchPlans = async () => {
     setLoading(true);
+    console.log('[Plans] Fetching plans...');
     let query = supabase
       .from('physio_treatment_plans')
       .select(`
@@ -56,10 +57,17 @@ export default function PhysioPlansPage() {
       .order('created_at', { ascending: false });
 
     if (statusFilter) {
+      console.log('[Plans] Filtering by status:', statusFilter);
       query = query.eq('status', statusFilter);
     }
 
     const { data, error, count } = await query;
+    
+    console.log('[Plans] Response:', { data, error, count });
+
+    if (error) {
+      console.error('[Plans] Error fetching plans:', error);
+    }
 
     if (!error && data) {
       setPlans(data);

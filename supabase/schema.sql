@@ -670,6 +670,7 @@ CREATE TABLE public.physio_treatment_plans (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   patient_id uuid NOT NULL,
   medical_record_id uuid,
+  evaluation_id uuid,
   prescribing_doctor_id uuid,
   department_id uuid,
   diagnosis_code character varying,
