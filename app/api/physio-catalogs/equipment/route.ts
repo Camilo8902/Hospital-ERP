@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const availableOnly = searchParams.get('available') === 'true';
     
     let query = adminSupabase
-      .from('physio_equipment_with_params')
+      .from('physio_equipment')
       .select('*')
       .order('name');
     
@@ -22,14 +22,56 @@ export async function GET(request: NextRequest) {
     if (treatmentTypeId) query = query.eq('treatment_type_id', treatmentTypeId);
     if (availableOnly) query = query.eq('status', 'available');
     
-    const { data, error } = await query;
+    const { data: equipment, error } = await query;
     
     if (error) {
       console.error('Supabase error:', error);
       return NextResponse.json({ error: error.message, details: error }, { status: 400 });
     }
     
-    return NextResponse.json(data || []);
+    // Si no hay equipos, retornar array vacío
+    if (!equipment || equipment.length === 0) {
+      return NextResponse.json([]);
+    }
+    
+    // Obtener los IDs de los equipos
+    const equipmentIds = equipment.map((e: any) => e.id);
+    
+    // Obtener los parámetros de todos los equipos
+    const { data: parameters, error: paramsError } = await adminSupabase
+      .from('physio_equipment_parameter_fields')
+      .select('*')
+      .in('equipment_id', equipmentIds)
+      .order('field_order');
+    
+    if (paramsError) {
+      console.error('Error fetching parameters:', paramsError);
+      // No fallar, solo continuar sin parámetros
+    }
+    
+    // Crear un mapa de parámetros por equipo
+    const paramsByEquipment: Record<string, any[]> = {};
+    if (parameters) {
+      for (const param of parameters) {
+        if (!paramsByEquipment[param.equipment_id]) {
+          paramsByEquipment[param.equipment_id] = [];
+        }
+        // Parsear field_options si es string
+        const parsedParam = {
+          ...param,
+          field_options: param.field_options ? JSON.parse(param.field_options) : null,
+        };
+        paramsByEquipment[param.equipment_id].push(parsedParam);
+      }
+    }
+    
+    // Combinar equipos con sus parámetros
+    const result = equipment.map((eq: any) => ({
+      ...eq,
+      parameter_fields: paramsByEquipment[eq.id] || [],
+    }));
+    
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching equipment:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
