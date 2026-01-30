@@ -669,6 +669,7 @@ CREATE TABLE public.physio_techniques (
 CREATE TABLE public.physio_treatment_plans (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   patient_id uuid NOT NULL,
+  medical_record_id uuid,
   prescribing_doctor_id uuid,
   department_id uuid,
   diagnosis_code character varying,
@@ -692,7 +693,8 @@ CREATE TABLE public.physio_treatment_plans (
   CONSTRAINT physio_treatment_plans_pkey PRIMARY KEY (id),
   CONSTRAINT physio_treatment_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id),
   CONSTRAINT physio_treatment_plans_prescribing_doctor_id_fkey FOREIGN KEY (prescribing_doctor_id) REFERENCES public.profiles(id),
-  CONSTRAINT physio_treatment_plans_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id)
+  CONSTRAINT physio_treatment_plans_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id),
+  CONSTRAINT physio_treatment_plans_medical_record_id_fkey FOREIGN KEY (medical_record_id) REFERENCES public.physio_medical_records(id)
 );
 CREATE TABLE public.physio_treatment_types (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

@@ -907,22 +907,26 @@ sequenceDiagram
 | Detalle de Plan - statusColors actualizados | ✅ Completo | `plans/[id]/page.tsx:23` |
 | Detalle de Plan - statusLabels actualizados | ✅ Completo | `plans/[id]/page.tsx:31` |
 | Detalle de Plan - Botón iniciar tratamiento | ✅ Completo | `plans/[id]/page.tsx:391` |
+| Schema SQL - CHECK constraint estados | ✅ Completo | `supabase/schema.sql:681` |
+| API Sessions - Auto-cambio de estado | ✅ Completo | `api/physio/sessions/route.ts` |
+| API Plans - Estado inicial "indicated" | ✅ Completo | `api/physio/plans/route.ts:71` |
 
 ### 10.2 Componentes Pendientes ❌
 
 | Componente | Prioridad | Descripción |
 |------------|-----------|-------------|
-| API: Auto-cambio de estado al crear sesión | Media | Cambiar automáticamente de "indicated" a "in_progress" al registrar primera sesión |
 | Validación de permisos por rol | Media | Verificar que solo fisioterapeutas puedan iniciar planes |
 | Notificaciones al iniciar plan | Baja | Enviar notificación al paciente |
+| Tests unitarios | Baja | Crear tests para la nueva funcionalidad |
 
 ### 10.3 Criterios de Éxito - Actualizado
 
 - [x] Fisioterapeuta puede crear plan desde evaluación en un solo flujo
 - [x] Datos se pre-llenan correctamente desde evaluación
+- [x] Estado cambia automáticamente: indicated → in_progress (al crear sesión)
 - [x] Estado cambia manualmente: indicated → in_progress (botón)
 - [x] Lista de planes muestra filtros correctos
-- [ ] Estado cambia automáticamente: indicated → in_progress (al crear sesión)
+- [ ] Tests unitarios pasan con cobertura >80%
 
 ---
 
