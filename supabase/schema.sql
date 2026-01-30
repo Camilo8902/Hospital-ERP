@@ -320,6 +320,7 @@ CREATE TABLE public.patients (
   notes text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  dni numeric UNIQUE,
   CONSTRAINT patients_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.payment_methods (
@@ -391,6 +392,41 @@ CREATE TABLE public.payment_webhook_events (
   received_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT payment_webhook_events_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.physio_alert_rules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name character varying NOT NULL,
+  alert_type character varying NOT NULL,
+  severity character varying DEFAULT 'medium'::character varying,
+  conditions jsonb NOT NULL DEFAULT '{}'::jsonb,
+  message_template text,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT physio_alert_rules_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.physio_alerts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  alert_rule_id uuid,
+  patient_id uuid NOT NULL,
+  treatment_plan_id uuid,
+  session_id uuid,
+  alert_type character varying NOT NULL,
+  severity character varying NOT NULL,
+  title character varying NOT NULL,
+  message text NOT NULL,
+  status character varying DEFAULT 'active'::character varying,
+  acknowledged_by uuid,
+  acknowledged_at timestamp with time zone,
+  resolution_notes text,
+  triggered_at timestamp with time zone DEFAULT now(),
+  resolved_at timestamp with time zone,
+  CONSTRAINT physio_alerts_pkey PRIMARY KEY (id),
+  CONSTRAINT physio_alerts_alert_rule_id_fkey FOREIGN KEY (alert_rule_id) REFERENCES public.physio_alert_rules(id),
+  CONSTRAINT physio_alerts_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id),
+  CONSTRAINT physio_alerts_treatment_plan_id_fkey FOREIGN KEY (treatment_plan_id) REFERENCES public.physio_treatment_plans(id),
+  CONSTRAINT physio_alerts_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.physio_sessions(id),
+  CONSTRAINT physio_alerts_acknowledged_by_fkey FOREIGN KEY (acknowledged_by) REFERENCES public.profiles(id)
+);
 CREATE TABLE public.physio_appointments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   patient_id uuid NOT NULL,
@@ -411,6 +447,112 @@ CREATE TABLE public.physio_appointments (
   CONSTRAINT physio_appointments_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.physio_rooms(id),
   CONSTRAINT physio_appointments_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id)
 );
+CREATE TABLE public.physio_clinical_protocols (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name character varying NOT NULL,
+  code character varying NOT NULL UNIQUE,
+  description text,
+  category character varying NOT NULL,
+  body_region character varying,
+  evidence_level character varying,
+  total_sessions integer,
+  session_duration_minutes integer DEFAULT 60,
+  phases jsonb NOT NULL DEFAULT '[]'::jsonb,
+  therapeutic_objectives ARRAY,
+  contraindications ARRAY,
+  precautions text,
+  required_equipment ARRAY,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT physio_clinical_protocols_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.physio_equipment (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  code text NOT NULL UNIQUE,
+  name text NOT NULL,
+  brand text,
+  model text,
+  serial_number text,
+  treatment_type_id uuid,
+  specifications jsonb,
+  parameters_template jsonb,
+  location text,
+  status text DEFAULT 'available'::text,
+  purchase_date date,
+  last_maintenance_date date,
+  next_maintenance_date date,
+  is_active boolean DEFAULT true,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT physio_equipment_pkey PRIMARY KEY (id),
+  CONSTRAINT physio_equipment_treatment_type_id_fkey FOREIGN KEY (treatment_type_id) REFERENCES public.physio_treatment_types(id)
+);
+CREATE TABLE public.physio_exercises (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  code text NOT NULL UNIQUE,
+  name text NOT NULL,
+  description text,
+  target_muscle_group ARRAY,
+  body_region text,
+  difficulty_level text,
+  instructions text,
+  video_url text,
+  image_url text,
+  parameters_template jsonb,
+  contraindications ARRAY,
+  is_active boolean DEFAULT true,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT physio_exercises_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.physio_functional_evolution (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL,
+  subjective_assessment text NOT NULL,
+  objective_findings text NOT NULL,
+  assessment text NOT NULL,
+  treatment_plan text NOT NULL,
+  pain_before integer CHECK (pain_before >= 0 AND pain_before <= 10),
+  pain_after integer CHECK (pain_after >= 0 AND pain_after <= 10),
+  rom_measurements jsonb DEFAULT '[]'::jsonb,
+  strength_grade jsonb DEFAULT '[]'::jsonb,
+  session_objectives ARRAY,
+  objectives_achieved ARRAY,
+  patient_response text,
+  tolerance text,
+  adverse_reactions text,
+  therapist_signature uuid,
+  signed_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT physio_functional_evolution_pkey PRIMARY KEY (id),
+  CONSTRAINT physio_functional_evolution_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.physio_sessions(id),
+  CONSTRAINT physio_functional_evolution_therapist_signature_fkey FOREIGN KEY (therapist_signature) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.physio_informed_consents (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  patient_id uuid NOT NULL,
+  treatment_plan_id uuid,
+  medical_record_id uuid,
+  consent_type character varying NOT NULL DEFAULT 'treatment'::character varying,
+  procedure_description text NOT NULL,
+  risks ARRAY,
+  benefits ARRAY,
+  alternatives ARRAY,
+  signed_by_patient boolean DEFAULT false,
+  signed_by_representative boolean DEFAULT false,
+  representative_name character varying,
+  representative_dni character varying,
+  valid_from date NOT NULL DEFAULT CURRENT_DATE,
+  valid_until date,
+  status character varying DEFAULT 'pending'::character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT physio_informed_consents_pkey PRIMARY KEY (id),
+  CONSTRAINT physio_informed_consents_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id),
+  CONSTRAINT physio_informed_consents_treatment_plan_id_fkey FOREIGN KEY (treatment_plan_id) REFERENCES public.physio_treatment_plans(id),
+  CONSTRAINT physio_informed_consents_medical_record_id_fkey FOREIGN KEY (medical_record_id) REFERENCES public.physio_medical_records(id)
+);
 CREATE TABLE public.physio_medical_records (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   patient_id uuid NOT NULL,
@@ -426,8 +568,6 @@ CREATE TABLE public.physio_medical_records (
   traumatic_history text,
   medical_history text,
   family_history text,
-  allergies ARRAY,
-  contraindications ARRAY,
   precautions text,
   physical_examination text,
   postural_evaluation text,
@@ -441,15 +581,20 @@ CREATE TABLE public.physio_medical_records (
   womac_score numeric CHECK (womac_score >= 0::numeric AND womac_score <= 96::numeric),
   roland_morris_score integer CHECK (roland_morris_score >= 0 AND roland_morris_score <= 24),
   clinical_diagnosis text,
-  icd10_codes ARRAY,
   functional_limitations text,
-  short_term_goals ARRAY,
-  long_term_goals ARRAY,
   patient_expectations text,
   informed_consent_signed boolean DEFAULT false,
   status character varying DEFAULT 'active'::character varying,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  informed_consent_date timestamp with time zone,
+  informed_consent_file_url text,
+  informed_consent_file_name text,
+  allergies jsonb,
+  icd10_codes jsonb,
+  short_term_goals jsonb,
+  long_term_goals jsonb,
+  contraindications jsonb,
   CONSTRAINT physio_medical_records_pkey PRIMARY KEY (id),
   CONSTRAINT physio_medical_records_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id),
   CONSTRAINT physio_medical_records_therapist_id_fkey FOREIGN KEY (therapist_id) REFERENCES public.profiles(id),
@@ -495,12 +640,31 @@ CREATE TABLE public.physio_sessions (
   muscle_group character varying,
   modality character varying,
   treatment_plan_id uuid,
+  exercises_applied ARRAY,
+  equipment_used ARRAY,
+  treatments_detail jsonb,
   CONSTRAINT physio_sessions_pkey PRIMARY KEY (id),
   CONSTRAINT physio_sessions_medical_record_id_fkey FOREIGN KEY (medical_record_id) REFERENCES public.medical_records(id),
-  CONSTRAINT physio_sessions_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.physio_appointments(id),
   CONSTRAINT physio_sessions_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id),
   CONSTRAINT physio_sessions_therapist_id_fkey FOREIGN KEY (therapist_id) REFERENCES public.profiles(id),
-  CONSTRAINT physio_sessions_treatment_plan_id_fkey FOREIGN KEY (treatment_plan_id) REFERENCES public.physio_treatment_plans(id)
+  CONSTRAINT physio_sessions_treatment_plan_id_fkey FOREIGN KEY (treatment_plan_id) REFERENCES public.physio_treatment_plans(id),
+  CONSTRAINT physio_sessions_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id)
+);
+CREATE TABLE public.physio_techniques (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  treatment_type_id uuid,
+  code text NOT NULL UNIQUE,
+  name text NOT NULL,
+  description text,
+  parameters_schema jsonb,
+  results_schema jsonb,
+  default_duration_minutes integer,
+  contraindications ARRAY,
+  is_active boolean DEFAULT true,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT physio_techniques_pkey PRIMARY KEY (id),
+  CONSTRAINT physio_techniques_treatment_type_id_fkey FOREIGN KEY (treatment_type_id) REFERENCES public.physio_treatment_types(id)
 );
 CREATE TABLE public.physio_treatment_plans (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -514,7 +678,7 @@ CREATE TABLE public.physio_treatment_plans (
   start_date date NOT NULL,
   expected_end_date date,
   actual_end_date date,
-  status character varying NOT NULL DEFAULT 'active'::character varying,
+  status character varying NOT NULL DEFAULT 'indicated'::character varying CHECK (status = ANY (ARRAY['indicated'::character varying, 'in_progress'::character varying, 'completed'::character varying, 'paused'::character varying, 'cancelled'::character varying])),
   sessions_per_week integer DEFAULT 3,
   total_sessions_prescribed integer,
   initial_assessment text,
@@ -529,6 +693,18 @@ CREATE TABLE public.physio_treatment_plans (
   CONSTRAINT physio_treatment_plans_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(id),
   CONSTRAINT physio_treatment_plans_prescribing_doctor_id_fkey FOREIGN KEY (prescribing_doctor_id) REFERENCES public.profiles(id),
   CONSTRAINT physio_treatment_plans_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id)
+);
+CREATE TABLE public.physio_treatment_types (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  code text NOT NULL UNIQUE,
+  name text NOT NULL,
+  description text,
+  category text,
+  icon_url text,
+  is_active boolean DEFAULT true,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT physio_treatment_types_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.prescriptions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

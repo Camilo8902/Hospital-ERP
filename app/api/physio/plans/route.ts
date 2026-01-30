@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       initial_assessment: body.initial_assessment,
       baseline_rom: body.baseline_rom,
       baseline_functional_score: body.baseline_functional_score,
-      status: 'active',
+      status: 'indicated',
       notes: body.notes,
     };
 
