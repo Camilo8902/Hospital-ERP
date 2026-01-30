@@ -910,6 +910,11 @@ sequenceDiagram
 | Schema SQL - CHECK constraint estados | ✅ Completo | `supabase/schema.sql:681` |
 | API Sessions - Auto-cambio de estado | ✅ Completo | `api/physio/sessions/route.ts` |
 | API Plans - Estado inicial "indicated" | ✅ Completo | `api/physio/plans/route.ts:71` |
+| **Validación de escalas funcionales** | ✅ **Enero 2026** | `evaluation/new/page.tsx:171-210` |
+| **Campo vas_score con validación 0-10** | ✅ **Enero 2026** | `evaluation/new/page.tsx:969-977` |
+| **Campo oswestry_score con validación 0-100** | ✅ **Enero 2026** | `evaluation/new/page.tsx:979-990` |
+| **Campo dash_score con validación 0-100** | ✅ **Enero 2026** | `evaluation/new/page.tsx:992-1002` |
+| **Campo roland_morris_score con validación 0-24** | ✅ **Enero 2026** | `evaluation/new/page.tsx:1004-1014` |
 
 ### 10.2 Componentes Pendientes ❌
 
@@ -930,6 +935,6 @@ sequenceDiagram
 
 ---
 
-**Última actualización:** Enero 2025  
-**Versión del documento:** 1.1  
-**Estado de implementación:** En progreso
+**Última actualización:** Enero 2026  
+**Versión del documento:** 1.2  
+**Estado de implementación:** En progreso - Validación de campos completada

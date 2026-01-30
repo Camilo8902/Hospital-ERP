@@ -55,10 +55,25 @@ export default function NewPhysioEvaluationForm() {
   const [saving, setSaving] = useState(false);
   const [uploadingConsent, setUploadingConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
   const [patientId, setPatientId] = useState<string | null>(searchParams.get('patient_id'));
   const [patients, setPatients] = useState<any[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Definición de validaciones de campos
+  const fieldValidations: Record<string, { min: number; max: number; field: string }> = {
+    vas_score: { min: 0, max: 10, field: 'VAS (0-10)' },
+    oswestry_score: { min: 0, max: 100, field: 'Oswestry (0-100)' },
+    dash_score: { min: 0, max: 100, field: 'DASH (0-100)' },
+    womac_score: { min: 0, max: 96, field: 'WOMAC (0-96)' },
+    roland_morris_score: { min: 0, max: 24, field: 'Roland-Morris (0-24)' },
+    pain_scale_baseline: { min: 0, max: 10, field: 'Dolor basal (0-10)' },
+    sessions_per_week: { min: 1, max: 7, field: 'Sesiones por semana (1-7)' },
+    total_sessions_prescribed: { min: 1, max: 100, field: 'Total sesiones (1-100)' },
+    baseline_functional_score: { min: 0, max: 100, field: 'Score funcional (0-100)' },
+    muscle_strength_grade: { min: 0, max: 5, field: 'Grado de fuerza (0-5)' },
+  };
   
   const [formData, setFormData] = useState({
     // Datos del paciente
@@ -155,9 +170,35 @@ export default function NewPhysioEvaluationForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    const numValue = type === 'number' ? (value ? parseFloat(value) : undefined) : value;
+    
+    // Validar rango si existe validación para este campo
+    if (type === 'number' && fieldValidations[name] && numValue !== undefined) {
+      const validation = fieldValidations[name];
+      if (numValue < validation.min || numValue > validation.max) {
+        setValidationErrors(prev => ({
+          ...prev,
+          [name]: `${validation.field}: Debe estar entre ${validation.min} y ${validation.max}`
+        }));
+      } else {
+        setValidationErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[name];
+          return newErrors;
+        });
+      }
+    } else if (type === 'number') {
+      // Limpiar error si el campo está vacío o no tiene validación
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? (value ? parseFloat(value) : undefined) : value,
+      [name]: numValue,
     }));
   };
 
@@ -916,10 +957,13 @@ console.log('Enviando datos:', {
                       name="vas_score"
                       min="0"
                       max="10"
-                      value={formData.vas_score}
+                      value={formData.vas_score || ''}
                       onChange={handleChange}
-                      className="input"
+                      className={`input ${validationErrors.vas_score ? 'border-red-500' : ''}`}
                     />
+                    {validationErrors.vas_score && (
+                      <p className="text-xs text-red-500 mt-1">{validationErrors.vas_score}</p>
+                    )}
                   </div>
                   <div>
                     <label className="label mb-1.5">Oswestry (0-100)</label>
@@ -930,8 +974,11 @@ console.log('Enviando datos:', {
                       max="100"
                       value={formData.oswestry_score || ''}
                       onChange={handleChange}
-                      className="input"
+                      className={`input ${validationErrors.oswestry_score ? 'border-red-500' : ''}`}
                     />
+                    {validationErrors.oswestry_score && (
+                      <p className="text-xs text-red-500 mt-1">{validationErrors.oswestry_score}</p>
+                    )}
                   </div>
                   <div>
                     <label className="label mb-1.5">DASH (0-100)</label>
@@ -942,8 +989,11 @@ console.log('Enviando datos:', {
                       max="100"
                       value={formData.dash_score || ''}
                       onChange={handleChange}
-                      className="input"
+                      className={`input ${validationErrors.dash_score ? 'border-red-500' : ''}`}
                     />
+                    {validationErrors.dash_score && (
+                      <p className="text-xs text-red-500 mt-1">{validationErrors.dash_score}</p>
+                    )}
                   </div>
                   <div>
                     <label className="label mb-1.5">Roland-Morris (0-24)</label>
@@ -954,8 +1004,11 @@ console.log('Enviando datos:', {
                       max="24"
                       value={formData.roland_morris_score || ''}
                       onChange={handleChange}
-                      className="input"
+                      className={`input ${validationErrors.roland_morris_score ? 'border-red-500' : ''}`}
                     />
+                    {validationErrors.roland_morris_score && (
+                      <p className="text-xs text-red-500 mt-1">{validationErrors.roland_morris_score}</p>
+                    )}
                   </div>
                 </div>
               </div>
