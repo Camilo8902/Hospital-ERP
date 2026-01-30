@@ -14,6 +14,25 @@ interface EquipmentParameterFieldProps {
   disabled?: boolean;
 }
 
+// Wrapper component that accepts key prop from React's map
+export function EquipmentParameterFieldWithKey({
+  field,
+  value,
+  onChange,
+  error,
+  disabled,
+}: EquipmentParameterFieldProps & { key: string }) {
+  return (
+    <EquipmentParameterField
+      field={field}
+      value={value}
+      onChange={onChange}
+      error={error}
+      disabled={disabled}
+    />
+  );
+}
+
 export function EquipmentParameterField({
   field,
   value,
@@ -117,6 +136,7 @@ export function EquipmentParameterField({
   
   // Campo de tipo text
   if (field.field_type === 'text') {
+    const textValue = typeof value === 'string' ? value : (field.field_default_value || '');
     return (
       <div key={field.id} className="space-y-1">
         <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700">
@@ -130,7 +150,7 @@ export function EquipmentParameterField({
           type="text"
           id={fieldId}
           name={field.field_name}
-          value={value ?? ''}
+          value={textValue}
           onChange={handleTextChange}
           disabled={disabled}
           className={`input ${error ? 'border-red-500' : ''}`}
@@ -144,6 +164,7 @@ export function EquipmentParameterField({
   // Campo de tipo select
   if (field.field_type === 'select') {
     const options: EquipmentFieldOption[] = field.field_options || [];
+    const selectValue = typeof value === 'string' ? value : '';
     
     return (
       <div key={field.id} className="space-y-1">
@@ -157,7 +178,7 @@ export function EquipmentParameterField({
         <select
           id={fieldId}
           name={field.field_name}
-          value={value ?? ''}
+          value={selectValue}
           onChange={handleSelectChange}
           disabled={disabled}
           className={`input ${error ? 'border-red-500' : ''}`}
@@ -249,7 +270,7 @@ export function EquipmentParametersForm({
   return (
     <div className="space-y-4">
       {visibleFields.map((field) => (
-        <EquipmentParameterField
+        <EquipmentParameterFieldWithKey
           key={field.id}
           field={field}
           value={values[field.field_name]}
