@@ -53,19 +53,26 @@ export default function PhysioPlanDetailPage() {
 
   const fetchPlan = async () => {
     try {
+      // Cargar el plan
       const { data, error } = await supabase
         .from('physio_treatment_plans')
         .select(`
           *,
-          patients (id, first_name, last_name, dni, phone, date_of_birth),
-          therapists (id, full_name, specialty, email),
-          physio_sessions (*)
+          patients (id, first_name, last_name, dni, phone, date_of_birth)
         `)
         .eq('id', planId)
         .single();
 
       if (error) throw error;
-      setPlan(data);
+      
+      // Cargar las sesiones por separado
+      const { data: sessions } = await supabase
+        .from('physio_sessions')
+        .select('*')
+        .eq('treatment_plan_id', planId)
+        .order('session_date', { ascending: false });
+      
+      setPlan({ ...data, physio_sessions: sessions || [] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar el plan');
     } finally {
@@ -373,7 +380,7 @@ export default function PhysioPlanDetailPage() {
               )}
               <div>
                 <p className="text-sm text-gray-500">Terapeuta</p>
-                <p className="font-medium">{plan.therapists?.full_name || 'N/A'}</p>
+                <p className="font-medium">Terapeuta asignado</p>
               </div>
             </div>
           </div>

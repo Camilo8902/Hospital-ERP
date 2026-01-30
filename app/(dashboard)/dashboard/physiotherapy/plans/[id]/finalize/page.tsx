@@ -54,17 +54,25 @@ export default function FinalizePhysioPlanPage() {
         .from('physio_treatment_plans')
         .select(`
           *,
-          patients (id, first_name, last_name, dni, phone),
-          physio_sessions (*)
+          patients (id, first_name, last_name, dni, phone)
         `)
         .eq('id', planId)
         .single();
 
       if (error) throw error;
-      setPlan(data);
+      
+      // Cargar sesiones por separado
+      const { data: sessions } = await supabase
+        .from('physio_sessions')
+        .select('*')
+        .eq('treatment_plan_id', planId)
+        .order('session_date', { ascending: false });
+      
+      const planWithSessions = { ...data, physio_sessions: sessions || [] };
+      setPlan(planWithSessions);
 
       // Pre-llenar datos
-      const completedSessions = data.physio_sessions?.filter((s: any) => s.status === 'completed').length || 0;
+      const completedSessions = sessions?.filter((s: any) => s.status === 'completed').length || 0;
       setFormData(prev => ({
         ...prev,
         sessions_completed: completedSessions,
@@ -82,7 +90,7 @@ export default function FinalizePhysioPlanPage() {
   };
 
   const calculatePreview = (planData: any) => {
-    const initialVas = planData.physio_medical_records?.pain_scale_baseline || planData.baseline_functional_score || 0;
+    const initialVas = planData.baseline_functional_score || 0;
     const completed = planData.physio_sessions?.filter((s: any) => s.status === 'completed').length || 0;
     
     setGeneratedSummary({
