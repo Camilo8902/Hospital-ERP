@@ -49,6 +49,23 @@ interface Equipment {
   status: string;
   location: string | null;
   treatment_types?: { name: string };
+  parameter_fields?: EquipmentParameterField[];
+}
+
+interface EquipmentParameterField {
+  id?: string;
+  field_name: string;
+  field_label: string;
+  field_description: string;
+  field_type: 'number' | 'text' | 'select' | 'range' | 'boolean';
+  field_unit: string;
+  field_default_value: string;
+  field_min: number;
+  field_max: number;
+  field_step: number;
+  field_options: { value: string; label: string }[];
+  field_required: boolean;
+  field_order: number;
 }
 
 interface Exercise {
@@ -169,6 +186,49 @@ export default function PhysioCatalogsPage() {
     setShowModal(false);
     setEditingItem(null);
     setFormData({});
+  };
+
+  // Funciones para campos parametrizables
+  const addParameterField = () => {
+    const params = (formData.parameter_fields as EquipmentParameterField[]) || [];
+    setFormData({
+      ...formData,
+      parameter_fields: [
+        ...params,
+        {
+          field_name: '',
+          field_label: '',
+          field_description: '',
+          field_type: 'number',
+          field_unit: '',
+          field_default_value: '',
+          field_min: 0,
+          field_max: 100,
+          field_step: 1,
+          field_options: [],
+          field_required: false,
+          field_order: params.length,
+        },
+      ],
+    });
+  };
+
+  const removeParameterField = (index: number) => {
+    const params = (formData.parameter_fields as EquipmentParameterField[]) || [];
+    setFormData({
+      ...formData,
+      parameter_fields: params.filter((_: any, i: number) => i !== index),
+    });
+  };
+
+  const updateParameterField = (index: number, field: string, value: any) => {
+    const params = (formData.parameter_fields as EquipmentParameterField[]) || [];
+    const updated = [...params];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({
+      ...formData,
+      parameter_fields: updated,
+    });
   };
 
   const handleSave = async () => {
@@ -646,7 +706,7 @@ export default function PhysioCatalogsPage() {
                       />
                     </div>
                     <div>
-                      <label className="label">Número Interno</label>
+                      <label className="label">Código Interno</label>
                       <input
                         type="text"
                         value={(formData.code as string) || ''}
@@ -758,6 +818,128 @@ export default function PhysioCatalogsPage() {
                       />
                     </div>
                   </div>
+                  
+                  {/* Campos Parametrizables */}
+                  <div className="mt-6 border-t pt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-md font-semibold text-gray-900">Campos Parametrizables</h3>
+                      <button
+                        type="button"
+                        onClick={addParameterField}
+                        className="btn btn-secondary text-sm flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Agregar Campo
+                      </button>
+                    </div>
+                    
+                    {(!formData.parameter_fields || (formData.parameter_fields as EquipmentParameterField[]).length === 0) && (
+                      <p className="text-sm text-gray-500 text-center py-4">
+                        No hay campos configurados. Agrega campos para definir los parámetros que se mostrarán al usar este equipo en sesiones.
+                      </p>
+                    )}
+                    
+                    {(formData.parameter_fields as EquipmentParameterField[]).map((param, index) => (
+                      <div key={index} className="p-4 bg-gray-50 rounded-lg mb-3">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-gray-700">Campo {index + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeParameterField(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="label text-xs">Nombre del campo *</label>
+                            <input
+                              type="text"
+                              value={param.field_name}
+                              onChange={(e) => updateParameterField(index, 'field_name', e.target.value)}
+                              className="input text-sm"
+                              placeholder="snake_case: intensity"
+                            />
+                          </div>
+                          <div>
+                            <label className="label text-xs">Label *</label>
+                            <input
+                              type="text"
+                              value={param.field_label}
+                              onChange={(e) => updateParameterField(index, 'field_label', e.target.value)}
+                              className="input text-sm"
+                              placeholder="Intensidad"
+                            />
+                          </div>
+                          <div>
+                            <label className="label text-xs">Tipo</label>
+                            <select
+                              value={param.field_type}
+                              onChange={(e) => updateParameterField(index, 'field_type', e.target.value)}
+                              className="input text-sm"
+                            >
+                              <option value="number">Número</option>
+                              <option value="text">Texto</option>
+                              <option value="select">Selección</option>
+                              <option value="range">Rango</option>
+                              <option value="boolean">Sí/No</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label text-xs">Unidad</label>
+                            <input
+                              type="text"
+                              value={param.field_unit}
+                              onChange={(e) => updateParameterField(index, 'field_unit', e.target.value)}
+                              className="input text-sm"
+                              placeholder="mA, Hz, min"
+                            />
+                          </div>
+                          {(param.field_type === 'number' || param.field_type === 'range') && (
+                            <>
+                              <div>
+                                <label className="label text-xs">Mínimo</label>
+                                <input
+                                  type="number"
+                                  value={param.field_min}
+                                  onChange={(e) => updateParameterField(index, 'field_min', parseFloat(e.target.value))}
+                                  className="input text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="label text-xs">Máximo</label>
+                                <input
+                                  type="number"
+                                  value={param.field_max}
+                                  onChange={(e) => updateParameterField(index, 'field_max', parseFloat(e.target.value))}
+                                  className="input text-sm"
+                                />
+                              </div>
+                            </>
+                          )}
+                          {param.field_type === 'select' && (
+                            <div className="col-span-2">
+                              <label className="label text-xs">Opciones (value,label)</label>
+                              <textarea
+                                value={param.field_options.map((o: any) => `${o.value},${o.label}`).join(';')}
+                                onChange={(e) => {
+                                  const opts = e.target.value.split(';').map((o: string) => {
+                                    const [v, l] = o.split(',');
+                                    return { value: v?.trim() || '', label: l?.trim() || '' };
+                                  }).filter((o: any) => o.value && o.label);
+                                  updateParameterField(index, 'field_options', opts);
+                                }}
+                                className="input text-sm"
+                                placeholder="continuo,Continuo;pulsado,Pulsado"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
                   <div className="flex items-center gap-2 mt-2">
                     <input
                       type="checkbox"

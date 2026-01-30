@@ -34,10 +34,14 @@ export default function NewPhysioPlanPage() {
   const [success, setSuccess] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
   const [evaluations, setEvaluations] = useState<any[]>([]);
+  const [equipment, setEquipment] = useState<any[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<any>(null);
+  const [equipmentParams, setEquipmentParams] = useState<Record<string, any>>({});
 
   const [formData, setFormData] = useState({
     patient_id: searchParams.get('patient_id') || '',
     evaluation_id: '',
+    equipment_id: '',
     diagnosis_code: '',
     diagnosis_description: '',
     plan_type: 'rehabilitation' as const,
@@ -50,6 +54,7 @@ export default function NewPhysioPlanPage() {
     baseline_rom: '',
     baseline_functional_score: 0 as number | null,
     notes: '',
+    equipment_params: {} as Record<string, any>,
   });
 
   // Cargar pacientes
@@ -61,13 +66,26 @@ export default function NewPhysioPlanPage() {
         .order('last_name');
       
       if (data) {
-        setPatients(data.map(p => ({
+        setPatients(data.map((p: any) => ({
           ...p,
           full_name: `${p.first_name} ${p.last_name}`
         })));
       }
     };
     fetchPatients();
+
+    // Cargar equipos disponibles
+    const fetchEquipment = async () => {
+      const { data } = await supabase
+        .from('physio_equipment')
+        .select('id, name, brand, model, status, parameter_fields')
+        .eq('is_active', true)
+        .in('status', ['available', 'in_use'])
+        .order('name');
+      
+      if (data) setEquipment(data);
+    };
+    fetchEquipment();
   }, []);
 
   // Cargar evaluaciones del paciente seleccionado
@@ -105,10 +123,27 @@ export default function NewPhysioPlanPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
       [name]: type === 'number' ? (value ? parseFloat(value) : null) : value,
     }));
+
+    // Si cambia el equipo, cargar sus parámetros
+    if (name === 'equipment_id') {
+      const selected = equipment.find((eq: any) => eq.id === value);
+      setSelectedEquipment(selected || null);
+      if (selected?.parameter_fields) {
+        const params: Record<string, any> = {};
+        (selected.parameter_fields as any[]).forEach((pf: any) => {
+          params[pf.field_name] = pf.field_default_value || '';
+        });
+        setEquipmentParams(params);
+        setFormData((prev: any) => ({ ...prev, equipment_params: params }));
+      } else {
+        setEquipmentParams({});
+        setFormData((prev: any) => ({ ...prev, equipment_params: {} }));
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,6 +160,7 @@ export default function NewPhysioPlanPage() {
       const planData = {
         patient_id: formData.patient_id,
         evaluation_id: formData.evaluation_id || null,
+        equipment_id: formData.equipment_id || null,
         therapist_id: user.id,
         diagnosis_code: formData.diagnosis_code || null,
         diagnosis_description: formData.diagnosis_description,
@@ -139,6 +175,7 @@ export default function NewPhysioPlanPage() {
         baseline_functional_score: formData.baseline_functional_score,
         status: 'active',
         notes: formData.notes || null,
+        equipment_params: formData.equipment_params || null,
       };
 
       const { data, error: insertError } = await supabase
@@ -285,7 +322,115 @@ export default function NewPhysioPlanPage() {
                   ))}
                 </select>
               </div>
+              <div className="md:col-span-2">
+                <label className="label mb-1.5">Equipo a utilizar (opcional)</label>
+                <select
+                  name="equipment_id"
+                  value={formData.equipment_id || ''}
+                  onChange={handleChange}
+                  className="input"
+                >
+                  <option value="">Sin equipo específico...</option>
+                  {equipment.map((eq: any) => (
+                    <option key={eq.id} value={eq.id}>
+                      {eq.name} {eq.brand ? `- ${eq.brand}` : ''} {eq.model ? `(${eq.model})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            {/* Mostrar parámetros del equipo seleccionado */}
+            {selectedEquipment && selectedEquipment.parameter_fields && (selectedEquipment.parameter_fields as any[]).length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-medium text-blue-900 mb-3">
+                  Parámetros de {selectedEquipment.name}
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {(selectedEquipment.parameter_fields as any[]).map((param: any) => (
+                    <div key={param.field_name}>
+                      <label className="label text-xs mb-1">
+                        {param.field_label}
+                        {param.field_unit && <span className="text-gray-400"> ({param.field_unit})</span>}
+                      </label>
+                      {param.field_type === 'number' && (
+                        <input
+                          type="number"
+                          value={equipmentParams[param.field_name] || ''}
+                          onChange={(e) => setEquipmentParams((prev: any) => ({
+                            ...prev,
+                            [param.field_name]: e.target.value ? parseFloat(e.target.value) : null
+                          }))}
+                          className="input text-sm"
+                          min={param.field_min}
+                          max={param.field_max}
+                          step={param.field_step || 1}
+                        />
+                      )}
+                      {param.field_type === 'text' && (
+                        <input
+                          type="text"
+                          value={equipmentParams[param.field_name] || ''}
+                          onChange={(e) => setEquipmentParams((prev: any) => ({
+                            ...prev,
+                            [param.field_name]: e.target.value
+                          }))}
+                          className="input text-sm"
+                        />
+                      )}
+                      {param.field_type === 'select' && (
+                        <select
+                          value={equipmentParams[param.field_name] || ''}
+                          onChange={(e) => setEquipmentParams((prev: any) => ({
+                            ...prev,
+                            [param.field_name]: e.target.value
+                          }))}
+                          className="input text-sm"
+                        >
+                          <option value="">Seleccionar...</option>
+                          {param.field_options?.map((opt: any) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      )}
+                      {param.field_type === 'range' && (
+                        <div className="space-y-1">
+                          <input
+                            type="range"
+                            value={equipmentParams[param.field_name] || param.field_min || 0}
+                            onChange={(e) => setEquipmentParams((prev: any) => ({
+                              ...prev,
+                              [param.field_name]: parseFloat(e.target.value)
+                            }))}
+                            className="w-full"
+                            min={param.field_min}
+                            max={param.field_max}
+                            step={param.field_step || 1}
+                          />
+                          <div className="text-xs text-center text-gray-600">
+                            {equipmentParams[param.field_name] || param.field_min || 0}
+                          </div>
+                        </div>
+                      )}
+                      {param.field_type === 'boolean' && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={!!equipmentParams[param.field_name]}
+                            onChange={(e) => setEquipmentParams((prev: any) => ({
+                              ...prev,
+                              [param.field_name]: e.target.checked
+                            }))}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">Sí</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <label className="label mb-1.5">Descripción del diagnóstico</label>
               <textarea
