@@ -461,3 +461,81 @@ export interface PhysioSessionForm {
   notes?: string;
   status?: string;
 }
+
+// =============================================================================
+// TIPOS PARA EQUIPOS Y CAMPOS CONFIGURABLES
+// =============================================================================
+
+// Tipo de campo configurable
+export type EquipmentFieldType = 'number' | 'text' | 'select' | 'range' | 'boolean';
+
+// Opción para campos de tipo select
+export interface EquipmentFieldOption {
+  value: string;
+  label: string;
+}
+
+// Campo configurable para equipo de fisioterapia
+export interface PhysioEquipmentParameterField {
+  id: string;
+  equipment_id: string;
+  field_name: string;              // Nombre técnico (snake_case): intensity, frequency, duration
+  field_label: string;             // Etiqueta visible: "Intensidad", "Frecuencia", "Duración"
+  field_description?: string;       // Descripción para el usuario
+  field_type: EquipmentFieldType;
+  field_unit?: string;             // Unidad: Hz, mA, min, cm, etc.
+  field_default_value?: string;    // Valor por defecto
+  field_min?: number;              // Valor mínimo (para number/range)
+  field_max?: number;              // Valor máximo (para number/range)
+  field_step?: number;             // Incremento (para number/range)
+  field_options?: EquipmentFieldOption[]; // Opciones para select
+  field_required: boolean;
+  field_order: number;             // Orden de aparición
+  field_visible: boolean;          // Si el campo es visible en sesiones
+  created_at: string;
+  updated_at: string;
+}
+
+// Equipo de fisioterapia del catálogo
+export interface PhysioEquipment {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  equipment_type: string;
+  manufacturer?: string;
+  model?: string;
+  treatment_type_id?: string;
+  status: 'available' | 'maintenance' | 'out_of_service' | 'retired';
+  serial_number?: string;
+  location?: string;
+  purchase_date?: string;
+  warranty_expiration?: string;
+  last_maintenance_date?: string;
+  next_maintenance_date?: string;
+  notes?: string;
+  // Campos calculados o relacionados
+  parameter_fields?: PhysioEquipmentParameterField[];
+  treatment_type_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Valor de campo configurable registrado en una sesión
+export interface PhysioSessionParameterValue {
+  field_id: string;                // ID del campo configurable
+  field_name: string;              // Nombre técnico del campo
+  field_label: string;             // Etiqueta visible
+  field_type: EquipmentFieldType;
+  field_unit?: string;             // Unidad
+  field_value: string | number | boolean; // Valor registrado
+}
+
+// Sesión de fisioterapia con valores de parámetros de equipos
+export interface PhysioSessionWithEquipmentParams extends PhysioSession {
+  equipment_used?: {
+    equipment_id: string;
+    equipment_name: string;
+    parameter_values: PhysioSessionParameterValue[];
+  }[];
+}

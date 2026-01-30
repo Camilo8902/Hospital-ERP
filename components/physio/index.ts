@@ -2,3 +2,4 @@
 export { VASScale } from './VASScale';
 export { StrengthGrade, BilateralStrength } from './StrengthGrade';
 export { ROMMeasurement, BilateralROM, JointROMSelector } from './ROMMeasurement';
+export { EquipmentParameterField, EquipmentParametersForm } from './EquipmentParameterField';
