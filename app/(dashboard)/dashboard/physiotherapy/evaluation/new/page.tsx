@@ -173,7 +173,7 @@ export default function NewPhysioEvaluationForm() {
     const numValue = type === 'number' ? (value ? parseFloat(value) : undefined) : value;
     
     // Validar rango si existe validación para este campo
-    if (type === 'number' && fieldValidations[name] && numValue !== undefined) {
+    if (type === 'number' && fieldValidations[name] && typeof numValue === "number") {
       const validation = fieldValidations[name];
       if (numValue < validation.min || numValue > validation.max) {
         setValidationErrors(prev => ({
@@ -1305,4 +1305,5 @@ console.log('Enviando datos:', {
     </div>
   );
 }
+
 
