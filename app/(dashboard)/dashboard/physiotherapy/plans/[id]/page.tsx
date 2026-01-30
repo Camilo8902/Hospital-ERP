@@ -15,20 +15,23 @@ import {
   Plus,
   FileText,
   TrendingUp,
-  Target
+  Target,
+  Play
 } from 'lucide-react';
 import Link from 'next/link';
 
 const statusColors: Record<string, string> = {
-  active: 'bg-green-100 text-green-800',
-  completed: 'bg-blue-100 text-blue-800',
+  indicated: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-green-100 text-green-800',
+  completed: 'bg-purple-100 text-purple-800',
   paused: 'bg-yellow-100 text-yellow-800',
   cancelled: 'bg-red-100 text-red-800',
 };
 
 const statusLabels: Record<string, string> = {
-  active: 'Activo',
-  completed: 'Completado',
+  indicated: 'Indicado',
+  in_progress: 'En Proceso',
+  completed: 'Culminado',
   paused: 'Pausado',
   cancelled: 'Cancelado',
 };
@@ -385,8 +388,37 @@ export default function PhysioPlanDetailPage() {
             </div>
           </div>
 
-          {/* Actions */}
-          {plan.status === 'active' && (
+          {/* Iniciar Plan - Cuando está Indicado */}
+          {plan.status === 'indicated' && (
+            <div className="card border-blue-200 bg-blue-50">
+              <div className="card-header bg-blue-100">
+                <h2 className="text-lg font-semibold text-blue-900 flex items-center gap-2">
+                  <Play className="w-5 h-5" />
+                  Iniciar Tratamiento
+                </h2>
+              </div>
+              <div className="card-body">
+                <p className="text-sm text-blue-800 mb-4">
+                  Este plan está indicado pero no ha comenzado.\n                    {!plan.physio_sessions || plan.physio_sessions.length === 0 ? (
+                      <span className="block mt-2">Aún no hay sesiones registradas.</span>
+                    ) : (
+                      <span className="block mt-2">{plan.physio_sessions.length} sesión(es) registrada(s).</span>
+                    )}
+                </p>
+                <button
+                  onClick={() => handleStatusChange('in_progress')}
+                  disabled={updating}
+                  className="btn-primary w-full"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Iniciar Plan de Tratamiento
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Actions - Cuando está En Proceso */}
+          {plan.status === 'in_progress' && (
             <div className="card">
               <div className="card-header">
                 <h2 className="text-lg font-semibold text-gray-900">Acciones</h2>

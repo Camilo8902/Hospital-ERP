@@ -890,7 +890,42 @@ sequenceDiagram
 
 ---
 
-**Documento preparado:** Enero 2025  
-**Versión:** 1.0  
-**Autor:** Equipo de Desarrollo MediCore ERP  
-**Próxima revisión:** Tras implementación
+## 10. Estado de Implementación (Enero 2025)
+
+### 10.1 Componentes Completados ✅
+
+| Componente | Estado | Archivo |
+|------------|--------|---------|
+| Tipos TypeScript | ✅ Completo | `lib/types/physiotherapy.ts` |
+| Estado "indicated" en PhysioTreatmentPlan | ✅ Completo | `lib/types/physiotherapy.ts:122` |
+| planStatusLabels y planStatusColors | ✅ Completo | `lib/types/physiotherapy.ts:141` |
+| Formulario de Evaluación - Checkbox activar plan | ✅ Completo | `evaluation/new/page.tsx:1073` |
+| Formulario de Evaluación - Configuración del plan | ✅ Completo | `evaluation/new/page.tsx:1092` |
+| Formulario de Evaluación - Lógica de creación | ✅ Completo | `evaluation/new/page.tsx:317` |
+| Lista de Planes - Filtro con "indicated" | ✅ Completo | `plans/page.tsx:122` |
+| Lista de Planes - Estadísticas | ✅ Completo | `plans/page.tsx:143` |
+| Detalle de Plan - statusColors actualizados | ✅ Completo | `plans/[id]/page.tsx:23` |
+| Detalle de Plan - statusLabels actualizados | ✅ Completo | `plans/[id]/page.tsx:31` |
+| Detalle de Plan - Botón iniciar tratamiento | ✅ Completo | `plans/[id]/page.tsx:391` |
+
+### 10.2 Componentes Pendientes ❌
+
+| Componente | Prioridad | Descripción |
+|------------|-----------|-------------|
+| API: Auto-cambio de estado al crear sesión | Media | Cambiar automáticamente de "indicated" a "in_progress" al registrar primera sesión |
+| Validación de permisos por rol | Media | Verificar que solo fisioterapeutas puedan iniciar planes |
+| Notificaciones al iniciar plan | Baja | Enviar notificación al paciente |
+
+### 10.3 Criterios de Éxito - Actualizado
+
+- [x] Fisioterapeuta puede crear plan desde evaluación en un solo flujo
+- [x] Datos se pre-llenan correctamente desde evaluación
+- [x] Estado cambia manualmente: indicated → in_progress (botón)
+- [x] Lista de planes muestra filtros correctos
+- [ ] Estado cambia automáticamente: indicated → in_progress (al crear sesión)
+
+---
+
+**Última actualización:** Enero 2025  
+**Versión del documento:** 1.1  
+**Estado de implementación:** En progreso
