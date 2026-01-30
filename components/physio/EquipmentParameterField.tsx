@@ -42,6 +42,7 @@ export function EquipmentParameterField({
   
   // Campo de tipo number
   if (field.field_type === 'number') {
+    const numValue = typeof value === 'number' ? value : 0;
     return (
       <div key={field.id} className="space-y-1">
         <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700">
@@ -56,7 +57,7 @@ export function EquipmentParameterField({
           type="number"
           id={fieldId}
           name={field.field_name}
-          value={value ?? ''}
+          value={numValue}
           onChange={handleNumberChange}
           min={field.field_min}
           max={field.field_max}
