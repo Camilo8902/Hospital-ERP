@@ -206,6 +206,7 @@ export default function PhysioCatalogsPage() {
     setShowModal(false);
     setEditingItem(null);
     setFormData({});
+    setSearchQuery(''); // Limpiar búsqueda al cerrar modal
   };
 
   // Funciones para campos parametrizables
