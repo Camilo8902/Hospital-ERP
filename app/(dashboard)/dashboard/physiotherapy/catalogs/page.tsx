@@ -860,106 +860,105 @@ export default function PhysioCatalogsPage() {
                       </p>
                     )}
                     
-                    {formData.parameter_fields?.map((param, index) => (
+                    {(formData.parameter_fields as EquipmentParameterField[])?.map((param, index) => (
                       <div key={param.id ?? `param-${index}`} className="p-4 bg-gray-50 rounded-lg mb-3">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-medium text-gray-700">Campo {index + 1}</span>
-                            <button
-                              type="button"
-                              onClick={() => removeParameterField(index)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-gray-700">Campo {index + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeParameterField(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="label text-xs">Nombre del campo *</label>
+                            <input
+                              type="text"
+                              value={param.field_name}
+                              onChange={(e) => updateParameterField(index, 'field_name', e.target.value)}
+                              className="input text-sm"
+                              placeholder="snake_case: intensity"
+                            />
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="label text-xs">Nombre del campo *</label>
-                              <input
-                                type="text"
-                                value={param.field_name}
-                                onChange={(e) => updateParameterField(index, 'field_name', e.target.value)}
-                                className="input text-sm"
-                                placeholder="snake_case: intensity"
-                              />
-                            </div>
-                            <div>
-                              <label className="label text-xs">Label *</label>
-                              <input
-                                type="text"
-                                value={param.field_label}
-                                onChange={(e) => updateParameterField(index, 'field_label', e.target.value)}
-                                className="input text-sm"
-                                placeholder="Intensidad"
-                              />
-                            </div>
-                            <div>
-                              <label className="label text-xs">Tipo</label>
-                              <select
-                                value={param.field_type}
-                                onChange={(e) => updateParameterField(index, 'field_type', e.target.value)}
-                                className="input text-sm"
-                              >
-                                <option value="number">Número</option>
-                                <option value="text">Texto</option>
-                                <option value="select">Selección</option>
-                                <option value="range">Rango</option>
-                                <option value="boolean">Sí/No</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="label text-xs">Unidad</label>
-                              <input
-                                type="text"
-                                value={param.field_unit}
-                                onChange={(e) => updateParameterField(index, 'field_unit', e.target.value)}
-                                className="input text-sm"
-                                placeholder="mA, Hz, min"
-                              />
-                            </div>
-                            {(param.field_type === 'number' || param.field_type === 'range') && (
-                              <>
-                                <div>
-                                  <label className="label text-xs">Mínimo</label>
-                                  <input
-                                    type="number"
-                                    value={param.field_min}
-                                    onChange={(e) => updateParameterField(index, 'field_min', parseFloat(e.target.value))}
-                                    className="input text-sm"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="label text-xs">Máximo</label>
-                                  <input
-                                    type="number"
-                                    value={param.field_max}
-                                    onChange={(e) => updateParameterField(index, 'field_max', parseFloat(e.target.value))}
-                                    className="input text-sm"
-                                  />
-                                </div>
-                              </>
-                            )}
-                            {param.field_type === 'select' && (
-                              <div className="col-span-2">
-                                <label className="label text-xs">Opciones (value,label)</label>
-                                <textarea
-                                  value={(param.field_options || []).map((o: any) => `${o.value},${o.label}`).join(';')}
-                                  onChange={(e) => {
-                                    const opts = (e.target.value || '').split(';').map((o: string) => {
-                                      const [v, l] = o.split(',');
-                                      return { value: v?.trim() || '', label: l?.trim() || '' };
-                                    }).filter((o: any) => o.value && o.label);
-                                    updateParameterField(index, 'field_options', opts);
-                                  }}
+                          <div>
+                            <label className="label text-xs">Label *</label>
+                            <input
+                              type="text"
+                              value={param.field_label}
+                              onChange={(e) => updateParameterField(index, 'field_label', e.target.value)}
+                              className="input text-sm"
+                              placeholder="Intensidad"
+                            />
+                          </div>
+                          <div>
+                            <label className="label text-xs">Tipo</label>
+                            <select
+                              value={param.field_type}
+                              onChange={(e) => updateParameterField(index, 'field_type', e.target.value)}
+                              className="input text-sm"
+                            >
+                              <option value="number">Número</option>
+                              <option value="text">Texto</option>
+                              <option value="select">Selección</option>
+                              <option value="range">Rango</option>
+                              <option value="boolean">Sí/No</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label text-xs">Unidad</label>
+                            <input
+                              type="text"
+                              value={param.field_unit}
+                              onChange={(e) => updateParameterField(index, 'field_unit', e.target.value)}
+                              className="input text-sm"
+                              placeholder="mA, Hz, min"
+                            />
+                          </div>
+                          {(param.field_type === 'number' || param.field_type === 'range') && (
+                            <>
+                              <div>
+                                <label className="label text-xs">Mínimo</label>
+                                <input
+                                  type="number"
+                                  value={param.field_min}
+                                  onChange={(e) => updateParameterField(index, 'field_min', parseFloat(e.target.value))}
                                   className="input text-sm"
-                                  placeholder="continuo,Continuo;pulsado,Pulsado"
                                 />
                               </div>
-                            )}
-                          </div>
+                              <div>
+                                <label className="label text-xs">Máximo</label>
+                                <input
+                                  type="number"
+                                  value={param.field_max}
+                                  onChange={(e) => updateParameterField(index, 'field_max', parseFloat(e.target.value))}
+                                  className="input text-sm"
+                                />
+                              </div>
+                            </>
+                          )}
+                          {param.field_type === 'select' && (
+                            <div className="col-span-2">
+                              <label className="label text-xs">Opciones (value,label)</label>
+                              <textarea
+                                value={(param.field_options || []).map((o: any) => `${o.value},${o.label}`).join(';')}
+                                onChange={(e) => {
+                                  const opts = (e.target.value || '').split(';').map((o: string) => {
+                                    const [v, l] = o.split(',');
+                                    return { value: v?.trim() || '', label: l?.trim() || '' };
+                                  }).filter((o: any) => o.value && o.label);
+                                  updateParameterField(index, 'field_options', opts);
+                                }}
+                                className="input text-sm"
+                                placeholder="continuo,Continuo;pulsado,Pulsado"
+                              />
+                            </div>
+                          )}
                         </div>
-                      )
-                    )}
+                      </div>
+                    ))}
                   </div>
                   
                   <div className="flex items-center gap-2 mt-2">
