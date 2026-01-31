@@ -684,7 +684,7 @@ export default function PhysioCatalogsPage() {
                         required
                       >
                         <option value="">Seleccionar...</option>
-                        {treatmentTypes.map((tt) => (
+                        {(treatmentTypes || []).map((tt) => (
                           <option key={tt.id} value={tt.id}>{tt.name}</option>
                         ))}
                       </select>
@@ -860,7 +860,7 @@ export default function PhysioCatalogsPage() {
                       </p>
                     )}
                     
-                    {(formData.parameter_fields as EquipmentParameterField[]).map((param, index) => (
+                    {formData.parameter_fields && (formData.parameter_fields as EquipmentParameterField[]).map((param, index) => (
                       <div key={index} className="p-4 bg-gray-50 rounded-lg mb-3">
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-sm font-medium text-gray-700">Campo {index + 1}</span>
@@ -943,9 +943,9 @@ export default function PhysioCatalogsPage() {
                             <div className="col-span-2">
                               <label className="label text-xs">Opciones (value,label)</label>
                               <textarea
-                                value={param.field_options.map((o: any) => `${o.value},${o.label}`).join(';')}
+                                value={(param.field_options || []).map((o: any) => `${o.value},${o.label}`).join(';')}
                                 onChange={(e) => {
-                                  const opts = e.target.value.split(';').map((o: string) => {
+                                  const opts = (e.target.value || '').split(';').map((o: string) => {
                                     const [v, l] = o.split(',');
                                     return { value: v?.trim() || '', label: l?.trim() || '' };
                                   }).filter((o: any) => o.value && o.label);
