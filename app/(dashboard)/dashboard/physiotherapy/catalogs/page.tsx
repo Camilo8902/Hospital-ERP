@@ -80,26 +80,46 @@ interface Exercise {
 
 // API functions
 async function fetchTreatmentTypes(): Promise<TreatmentType[]> {
-  const res = await fetch('/api/physio-catalogs/treatment-types');
-  return res.json();
+  try {
+    const res = await fetch('/api/physio-catalogs/treatment-types');
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }
 
 async function fetchTechniques(treatmentTypeId?: string): Promise<Technique[]> {
-  const url = treatmentTypeId 
-    ? `/api/physio-catalogs/techniques?treatment_type_id=${treatmentTypeId}`
-    : '/api/physio-catalogs/techniques';
-  const res = await fetch(url);
-  return res.json();
+  try {
+    const url = treatmentTypeId 
+      ? `/api/physio-catalogs/techniques?treatment_type_id=${treatmentTypeId}`
+      : '/api/physio-catalogs/techniques';
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }
 
 async function fetchEquipment(): Promise<Equipment[]> {
-  const res = await fetch('/api/physio-catalogs/equipment');
-  return res.json();
+  try {
+    const res = await fetch('/api/physio-catalogs/equipment');
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }
 
 async function fetchExercises(): Promise<Exercise[]> {
-  const res = await fetch('/api/physio-catalogs/exercises');
-  return res.json();
+  try {
+    const res = await fetch('/api/physio-catalogs/exercises');
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }
 
 export default function PhysioCatalogsPage() {
@@ -283,6 +303,7 @@ export default function PhysioCatalogsPage() {
           last_maintenance_date: formData.last_maintenance_date || null,
           next_maintenance_date: formData.next_maintenance_date || null,
           is_active: formData.is_active !== false,
+          parameter_fields: (formData.parameter_fields as EquipmentParameterField[]) || null,
         };
         
         console.log('Guardando equipo:', equipmentData);
