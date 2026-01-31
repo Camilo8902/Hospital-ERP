@@ -861,7 +861,7 @@ export default function PhysioCatalogsPage() {
                     )}
                     
                     {formData.parameter_fields && Array.isArray(formData.parameter_fields) && 
-                      formData.parameter_fields.map((param: EquipmentParameterField, index: number) => (
+                      (formData.parameter_fields as EquipmentParameterField[]).map((param, index: number) => (
                         <div key={index} className="p-4 bg-gray-50 rounded-lg mb-3">
                           <div className="flex items-center justify-between mb-3">
                             <span className="text-sm font-medium text-gray-700">Campo {index + 1}</span>
