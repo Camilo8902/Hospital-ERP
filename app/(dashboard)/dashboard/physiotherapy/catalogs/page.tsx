@@ -757,7 +757,7 @@ export default function PhysioCatalogsPage() {
                         className="input"
                       >
                         <option value="">Ninguno</option>
-                        {treatmentTypes.map((tt) => (
+                        {(treatmentTypes || []).map((tt) => (
                           <option key={tt.id} value={tt.id}>{tt.name}</option>
                         ))}
                       </select>
